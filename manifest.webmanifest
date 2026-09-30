@@ -1,0 +1,17 @@
+{
+  "name": "Red vial: simulador de tráfico",
+  "short_name": "Red vial",
+  "description": "Modelo matemático del tráfico en la Ciudad de Guatemala: elige una vía, registra mediciones y simula el tiempo de viaje.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0E151B",
+  "theme_color": "#0A6C98",
+  "lang": "es",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
