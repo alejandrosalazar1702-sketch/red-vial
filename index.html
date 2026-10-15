@@ -70,7 +70,7 @@ p{margin:0}
 .btn.bad{color:var(--crit);border-color:var(--crit)}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
 .row{display:flex;flex-wrap:wrap;gap:8px}
-input[type=text],input[type=search],input[type=number],input[type=time]{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:0;width:100%}
+input[type=text],input[type=search],input[type=number],input[type=time],select{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:0;width:100%}
 .note{color:var(--muted);font-size:13px}
 .msg{font-size:13.5px;color:var(--crit);min-height:1.2em;margin-top:6px}
 
@@ -253,18 +253,29 @@ details ul{margin:8px 0 0;padding-left:20px}
   <section id="tab-meds" role="tabpanel" aria-labelledby="tb-meds" hidden>
     <div class="stack">
       <div class="panel">
+        <h2>Autollenar con datos de referencia</h2>
+        <p style="margin-bottom:10px">Elijan la vía y la app llena sola las mediciones de 6:00 a 19:30 y la demanda D0 del simulador, sin contar ni cronometrar.</p>
+        <div class="mform">
+          <div class="fld"><label for="ref-road">Vía</label><select id="ref-road"></select></div>
+          <div class="fld"><label for="ref-lanes">Carriles de la vía (todos los sentidos)</label><input id="ref-lanes" type="number" inputmode="numeric" min="1" max="16" step="1" value="6"></div>
+          <button class="btn" id="b-ref" type="button">Autollenar</button>
+        </div>
+        <p class="msg" id="ref-msg" role="status"></p>
+        <p class="note" style="margin-top:8px"><strong>Importante:</strong> los conteos de referencia por vía (por cada 30 min, en horario normal y en hora pico) fueron proporcionados por el equipo y no tienen una fuente verificada. Se reparten entre los carriles que escriban, y el valor por carril se limita al máximo del modelo. La velocidad no es una medición: la calcula el modelo a partir del flujo. Por eso estas filas se marcan «referencia», no entran al ajuste y no sustituyen una medición en campo. Declárenlo así en el informe (sección 9).</p>
+      </div>
+      <div class="panel">
         <h2>Registrar una medición</h2>
         <details open style="margin-bottom:14px">
           <summary>Cómo medir</summary>
           <ul>
-            <li>Elijan un punto de la vía y cuenten los vehículos de un solo carril que pasan durante 5 minutos.</li>
+            <li>Elijan un punto de la vía y cuenten los vehículos de un solo carril que pasan durante 30 minutos (si pueden, cuenten dos bloques de 15 min y súmenlos).</li>
             <li>Marquen un tramo de longitud conocida (por ejemplo 200 m) y cronometren cuánto tarda un vehículo en recorrerlo. Mejor si promedian varios.</li>
-            <li>Repitan a tres horas distintas como mínimo, entre las 6:00 y las 9:00 a.m.</li>
+            <li>Repitan en tres horas distintas como mínimo por cada hora pico: mañana (antes de las 13:00) y tarde (desde las 13:00). El simulador cubre de 6:00 a 20:00.</li>
           </ul>
         </details>
         <form id="f-meas" class="mform" novalidate>
           <div class="fld"><label for="m-time">Hora</label><input id="m-time" type="time" value="07:30"></div>
-          <div class="fld"><label for="m-count">Vehículos en 5 min</label><input id="m-count" type="number" inputmode="numeric" min="1" step="1" placeholder="Ej. 38"></div>
+          <div class="fld"><label for="m-count">Vehículos en 30 min</label><input id="m-count" type="number" inputmode="numeric" min="1" step="1" placeholder="Ej. 228"></div>
           <div class="fld"><label for="m-len">Tramo medido (km)</label><input id="m-len" type="number" inputmode="decimal" min="0.05" step="0.05" value="0.2"></div>
           <div class="fld"><label for="m-sec">Tiempo del tramo (s)</label><input id="m-sec" type="number" inputmode="decimal" min="1" step="1" placeholder="Ej. 24"></div>
           <button class="btn" type="submit">Agregar</button>
@@ -325,8 +336,8 @@ details ul{margin:8px 0 0;padding-left:20px}
           <div class="presets" id="presets" role="group" aria-label="Escenarios de ejemplo"></div>
           <div class="ctl">
             <label for="h">Hora de salida</label><output id="o-h" for="h"></output>
-            <input type="range" id="h" min="6" max="9" step="0.25" value="7.5">
-            <small>Entre las 6:00 y las 9:00 a.m.</small>
+            <input type="range" id="h" min="6" max="20" step="0.25" value="7.5">
+            <small>Entre las 6:00 y las 20:00.</small>
           </div>
           <div class="ctl">
             <label for="a">Lluvia (a)</label><output id="o-a" for="a"></output>
@@ -368,7 +379,7 @@ details ul{margin:8px 0 0;padding-left:20px}
           <div class="panel chart"><h3>Velocidad según la densidad</h3><p class="eq">v(k) = (1 − a) · vf · (1 − k / (c · kj)) · lineal</p><div class="plot" id="p1"></div></div>
           <div class="panel chart"><h3>Flujo según la densidad</h3><p class="eq">q(k) = k · v(k) · cuadrática</p><div class="plot" id="p2"></div></div>
           <div class="panel chart"><h3>Tiempo de viaje según la hora</h3><p class="eq">T = d / v + n · ts · racional</p><div class="plot" id="p3"></div></div>
-          <div class="panel chart"><h3>Densidad según la hora</h3><p class="eq">k(h) = kmax − α · (h − hp)² · cuadrática</p><div class="plot" id="p4"></div></div>
+          <div class="panel chart"><h3>Densidad según la hora</h3><p class="eq">k(h) = la mayor de dos parábolas, mañana y tarde · cuadrática</p><div class="plot" id="p4"></div></div>
           <div class="panel chart wide"><h3>Demanda frente a la capacidad</h3><p class="eq">D(t) = D0 · (1 + r)^t · exponencial; t = ln(C / D0) / ln(1 + r) · logarítmica</p><div class="plot" id="p5"></div></div>
         </section>
 
@@ -415,18 +426,23 @@ details ul{margin:8px 0 0;padding-left:20px}
     { k: 'd',    l: 'Distancia (d)',                 u: 'km',               def: 10,   min: 0.1, step: 0.1 },
     { k: 'n',    l: 'Semáforos (n)',                 u: 'semáforos',        def: 4,    min: 0, step: 1 },
     { k: 'ts',   l: 'Espera por semáforo (ts)',      u: 'min',              def: 1,    min: 0, step: 0.5 },
-    { k: 'kmax', l: 'Densidad en hora pico (kmax)',  u: 'veh/km',           def: 120,  min: 0, step: 5, fit: true },
-    { k: 'hp',   l: 'Hora pico (hp)',                u: 'hora, 7.5 = 7:30', def: 7.5,  min: 0, step: 0.25, fit: true },
-    { k: 'al',   l: 'Apertura de la parábola (α)',   u: 'veh/km por h²',    def: 30,   min: 0, step: 1, fit: true },
+    { k: 'kmax', l: 'Densidad en la hora pico de la mañana (kmax)',  u: 'veh/km',           def: 120,  min: 0, step: 5, fit: true },
+    { k: 'hp',   l: 'Hora pico de la mañana (hp)',                u: 'hora, 7.5 = 7:30', def: 7.5,  min: 0, step: 0.25, fit: true },
+    { k: 'al',   l: 'Apertura de la parábola de la mañana (α)',   u: 'veh/km por h²',    def: 30,   min: 0, step: 1, fit: true },
+    { k: 'kmax2', l: 'Densidad en la hora pico de la tarde (kmax2)', u: 'veh/km', def: 125, min: 0, step: 5, fit: true },
+    { k: 'hp2',   l: 'Hora pico de la tarde (hp2)', u: 'hora, 17.5 = 17:30', def: 17.5, min: 0, step: 0.25, fit: true },
+    { k: 'al2',   l: 'Apertura de la parábola de la tarde (α2)', u: 'veh/km por h²', def: 20, min: 0, step: 1, fit: true },
     { k: 'D0',   l: 'Demanda actual (D0)',           u: 'veh/h',            def: 1800, min: 1, step: 50 },
     { k: 'r',    l: 'Crecimiento anual (r)',         u: '% por año',        def: 4,    min: 0, step: 0.5, scale: 0.01 }
   ];
   var PRESETS = [
-    { n: 'Día seco, hora pico', a: 0, c: 1, h: 7.5 },
-    { n: 'Lluvia, hora pico', a: 0.15, c: 1, h: 7.5 },
-    { n: 'Carril cerrado, hora pico', a: 0, c: 0.5, h: 7.5 },
-    { n: 'Lluvia y carril cerrado', a: 0.15, c: 0.5, h: 7.5 },
-    { n: 'Día seco, 6:00 a.m.', a: 0, c: 1, h: 6 }
+    { n: 'Día seco, 7:30', a: 0, c: 1, h: 7.5 },
+    { n: 'Lluvia, 7:30', a: 0.15, c: 1, h: 7.5 },
+    { n: 'Carril cerrado, 7:30', a: 0, c: 0.5, h: 7.5 },
+    { n: 'Lluvia y carril cerrado, 7:30', a: 0.15, c: 0.5, h: 7.5 },
+    { n: 'Día seco, 6:00', a: 0, c: 1, h: 6 },
+    { n: 'Día seco, 17:30', a: 0, c: 1, h: 17.5 },
+    { n: 'Lluvia, 17:30', a: 0.15, c: 1, h: 17.5 }
   ];
   var AVENUES = ['Periférico', 'Calzada Roosevelt', 'Avenida Las Américas', 'Bulevar Liberación', 'Calzada Aguilar Batres',
     'Bulevar Los Próceres', 'Avenida Petapa', 'Calzada San Juan', 'Calzada Atanasio Tzul', 'Carretera a El Salvador'];
@@ -498,7 +514,7 @@ details ul{margin:8px 0 0;padding-left:20px}
   });
 
   /* ---------------- Modelo ---------------- */
-  function kOf(h) { return Math.max(0, P.kmax - P.al * Math.pow(h - P.hp, 2)); }
+  function kOf(h) { return Math.max(0, P.kmax - P.al * Math.pow(h - P.hp, 2), P.kmax2 - P.al2 * Math.pow(h - P.hp2, 2)); }
   function vK(k, a, c) { var ck = c * P.kj; return k >= ck ? 0 : (1 - a) * P.vf * (1 - k / ck); }
   function model(a, c, h) {
     var k = kOf(h), ck = c * P.kj, v = vK(k, a, c);
@@ -582,7 +598,7 @@ details ul{margin:8px 0 0;padding-left:20px}
   function renderSim() {
     if ($('tab-sim').hidden) return;
     var m = model(S.a, S.c, S.h);
-    $('o-h').textContent = fh(S.h) + ' a.m.';
+    $('o-h').textContent = fh(S.h) + ' h';
     $('o-a').textContent = f0(S.a * 100) + '%';
     $('o-c').textContent = f0(S.c * 100) + '%';
     PRESETS.forEach(function (p, i) {
@@ -607,7 +623,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     $('road').innerHTML = road;
     $('roadcap').textContent = '1 km de vía. Cada bloque equivale a ' + f1(P.kj / N) + ' veh/km; los bloques rayados son carril cerrado.';
 
-    var free = P.d / P.vf * 60 + P.n * P.ts, hh = fh(S.h) + ' a.m.', txt = '';
+    var free = P.d / P.vf * 60 + P.n * P.ts, hh = fh(S.h), txt = '';
     if (m.collapse) {
       txt += '<p class="warn">A las ' + hh + ' la densidad es de ' + f1(m.k) + ' veh/km y en este escenario la vía solo admite ' + f1(m.ck) + ' veh/km. La velocidad llega a cero: la vía colapsa y el modelo deja de ser válido en ese momento.</p>';
     } else {
@@ -636,18 +652,18 @@ details ul{margin:8px 0 0;padding-left:20px}
       at: function (x) { var q = x * vK(x, S.a, S.c); return { y: q, t: f0(x) + ' veh/km → ' + f0(q) + ' veh/h' }; } });
 
     var ymaxT = 120, pt = [], pk = [], sh = [], cur = null, h;
-    for (h = 6; h <= 9 + 1e-9; h += 0.02) {
+    for (h = 6; h <= 20 + 1e-9; h += 0.05) {
       var mm = model(S.a, S.c, h);
       pk.push([h, mm.k]);
       if (mm.collapse) { pt.push(null); if (!cur) cur = [h, h]; else cur[1] = h; }
       else { pt.push([h, mm.T]); if (cur) { sh.push(cur); cur = null; } }
     }
     if (cur) sh.push(cur);
-    var hx = [6, 6.5, 7, 7.5, 8, 8.5, 9];
-    draw('p3', { x0: 6, x1: 9, y1: ymaxT, xt: hx, xf: fh, yf: f0, xl: 'Hora del día (a.m.)', yl: 'Tiempo de viaje T (min)',
+    var hx = [6, 8, 10, 12, 14, 16, 18, 20];
+    draw('p3', { x0: 6, x1: 20, y1: ymaxT, xt: hx, xf: fh, yf: f0, xl: 'Hora del día', yl: 'Tiempo de viaje T (min)',
       pts: pt, shade: sh, dots: m.collapse ? [] : [{ x: S.h, y: m.T }], aria: 'Tiempo de viaje en función de la hora',
       at: function (x) { var z = model(S.a, S.c, x); return z.collapse ? { y: ymaxT, t: fh(x) + ' → colapso' } : { y: z.T, t: fh(x) + ' → ' + f0(z.T) + ' min' }; } });
-    draw('p4', { x0: 6, x1: 9, y1: P.kj, xt: hx, xf: fh, yf: f0, xl: 'Hora del día (a.m.)', yl: 'Densidad k (veh/km)',
+    draw('p4', { x0: 6, x1: 20, y1: P.kj, xt: hx, xf: fh, yf: f0, xl: 'Hora del día', yl: 'Densidad k (veh/km)',
       pts: pk, dots: [{ x: S.h, y: m.k, c: m.collapse ? 'bad' : '' }], hl: [{ y: m.ck, t: 'capacidad c·kj = ' + f0(m.ck) + ' veh/km' }],
       aria: 'Densidad de vehículos en función de la hora',
       at: function (x) { var z = kOf(x); return { y: z, t: fh(x) + ' → ' + f1(z) + ' veh/km' }; } });
@@ -674,25 +690,27 @@ details ul{margin:8px 0 0;padding-left:20px}
 
   /* ---------------- Mediciones ---------------- */
   function derived(m) {
-    var q = m.count * 12, v = m.sec > 0 ? m.len * 3600 / m.sec : NaN, k = v > 0 ? q / v : NaN;
+    var q = m.count * 60 / (m.win || 5), v = m.sec > 0 ? m.len * 3600 / m.sec : NaN, k = v > 0 ? q / v : NaN;
     return { q: q, v: v, k: k };
   }
   function parseHour(s) { var a = /^(\d{1,2}):(\d{2})$/.exec(s || ''); return a ? (+a[1]) + (+a[2]) / 60 : NaN; }
   function computeFit() {
-    var rows = R.meas.map(function (m) { return { h: m.h, d: derived(m) }; }).filter(function (r) { return isFinite(r.d.k) && isFinite(r.d.v); });
+    var rows = R.meas.filter(function (m) { return !m.ref; }).map(function (m) { return { h: m.h, d: derived(m) }; }).filter(function (r) { return isFinite(r.d.k) && isFinite(r.d.v); });
     var lin = window.RVfit.linfit(rows.map(function (r) { return r.d.k; }), rows.map(function (r) { return r.d.v; }));
-    var quad = window.RVfit.quadfit(rows.map(function (r) { return r.h; }), rows.map(function (r) { return r.d.k; }));
+    var CUT = 13, am = rows.filter(function (r) { return r.h < CUT; }), pm = rows.filter(function (r) { return r.h >= CUT; });
+    var qf = function (a) { return window.RVfit.quadfit(a.map(function (r) { return r.h; }), a.map(function (r) { return r.d.k; })); };
+    var quad = qf(am), quad2 = qf(pm);
     var L = (lin && lin.m < 0 && lin.b > 0) ? { vf: lin.b, kj: -lin.b / lin.m, m: lin.m, b: lin.b, r2: lin.r2, n: lin.n } : null;
-    var Q = (quad && quad.concave) ? quad : null;
-    return { rows: rows, lin: lin, quad: quad, L: L, Q: Q };
+    var Q = (quad && quad.concave) ? quad : null, Q2 = (quad2 && quad2.concave) ? quad2 : null;
+    return { rows: rows, am: am, pm: pm, lin: lin, quad: quad, quad2: quad2, L: L, Q: Q, Q2: Q2 };
   }
   function renderMeas() {
     if ($('tab-meds').hidden) return;
-    var i, html = '<thead><tr><th>Hora</th><th>Conteo 5 min</th><th>Tramo (km)</th><th>Tiempo (s)</th><th>q (veh/h)</th><th>v (km/h)</th><th>k (veh/km)</th><th></th></tr></thead><tbody>';
+    var i, html = '<thead><tr><th>Hora</th><th>Conteo</th><th>Tramo (km)</th><th>Tiempo (s)</th><th>q (veh/h)</th><th>v (km/h)</th><th>k (veh/km)</th><th></th></tr></thead><tbody>';
     var sorted = R.meas.map(function (m, idx) { return { m: m, idx: idx }; }).sort(function (a, b) { return a.m.h - b.m.h; });
     sorted.forEach(function (e) {
       var m = e.m, d = derived(m);
-      html += '<tr><td>' + fh(m.h) + (m.ex ? '<span class="ex">ejemplo</span>' : '') + '</td><td>' + f0(m.count) + '</td><td>' + f1(m.len) + '</td><td>' + f0(m.sec) + '</td><td>' + f0(d.q) + '</td><td>' + f1(d.v) + '</td><td>' + f1(d.k) +
+      html += '<tr><td>' + fh(m.h) + (m.ex ? '<span class="ex">ejemplo</span>' : '') + (m.ref ? '<span class="ex">referencia' + (m.cap ? ' · tope' : '') + '</span>' : '') + '</td><td>' + f0(m.count) + ' <span class="ex">' + (m.win || 5) + ' min</span></td><td>' + f1(m.len) + '</td><td>' + f0(m.sec) + '</td><td>' + f0(d.q) + '</td><td>' + f1(d.v) + '</td><td>' + f1(d.k) +
         '</td><td><button type="button" data-del="' + e.idx + '" aria-label="Quitar medición de las ' + fh(m.h) + '">×</button></td></tr>';
     });
     $('mt').innerHTML = R.meas.length ? html + '</tbody>' : '';
@@ -704,13 +722,17 @@ details ul{margin:8px 0 0;padding-left:20px}
     if (!F.lin) t += '<p>Agreguen al menos 2 mediciones con densidades distintas para ajustar la recta v(k).</p>';
     else if (!F.L) t += '<p>Con estos datos la velocidad no baja al subir la densidad, así que no sale una recta decreciente. Revisen las mediciones.</p>';
     else t += '<p>Recta v(k) = ' + f1(F.L.b) + ' − ' + (Math.round(-F.L.m * 1000) / 1000).toString().replace('.', ',') + ' · k. Sale <b>vf = ' + f1(F.L.vf) + ' km/h</b> y <b>kj = ' + f1(F.L.kj) + ' veh/km</b> (R² = ' + (Math.round(F.L.r2 * 100) / 100).toString().replace('.', ',') + ', ' + F.L.n + ' mediciones).</p>';
-    var hours = {}; F.rows.forEach(function (r) { hours[r.h.toFixed(3)] = 1; });
-    if (Object.keys(hours).length < 3) t += '<p>Para ajustar k(h) necesitan mediciones en al menos 3 horas distintas.</p>';
-    else if (!F.Q) t += '<p>La densidad no sube y baja alrededor de una hora pico con estos datos, así que no sale una parábola con máximo. Revisen las mediciones.</p>';
-    else t += '<p>Parábola k(h) con máximo a las <b>' + fh(F.Q.hp) + '</b>: <b>hp = ' + (Math.round(F.Q.hp * 100) / 100) + ' h</b>, <b>kmax = ' + f1(F.Q.kmax) + ' veh/km</b> y <b>α = ' + f1(F.Q.al) + ' veh/km por h²</b> (R² = ' + (Math.round(F.Q.r2 * 100) / 100).toString().replace('.', ',') + ').</p>';
-    if ((F.L && F.L.r2 < 0.85) || (F.Q && F.Q.r2 < 0.85)) t += '<p class="msg">Un R² bajo indica que los puntos no siguen bien el modelo. Revisen si alguna medición tiene un error, por ejemplo un conteo o un tiempo mal anotado.</p>';
+    function peak(label, rows, Q, sym, win) {
+      var hrs = {}; rows.forEach(function (r) { hrs[r.h.toFixed(3)] = 1; });
+      if (!rows.length) return '<p>Sin mediciones de la ' + label + ' (' + win + '). Si miden en esa franja, se ajusta su hora pico.</p>';
+      if (Object.keys(hrs).length < 3) return '<p>Para ajustar la hora pico de la ' + label + ' necesitan mediciones en al menos 3 horas distintas (' + win + ').</p>';
+      if (!Q) return '<p>La densidad de la ' + label + ' no sube y baja alrededor de una hora pico con estos datos, así que no sale una parábola con máximo. Revisen las mediciones.</p>';
+      return '<p>Hora pico de la ' + label + ' a las <b>' + fh(Q.hp) + '</b>: <b>hp' + sym + ' = ' + (Math.round(Q.hp * 100) / 100) + ' h</b>, <b>kmax' + sym + ' = ' + f1(Q.kmax) + ' veh/km</b> y <b>α' + sym + ' = ' + f1(Q.al) + ' veh/km por h²</b> (R² = ' + (Math.round(Q.r2 * 100) / 100).toString().replace('.', ',') + ').</p>';
+    }
+    t += peak('mañana', F.am, F.Q, '', 'antes de las 13:00') + peak('tarde', F.pm, F.Q2, '2', 'desde las 13:00');
+    if ((F.L && F.L.r2 < 0.85) || (F.Q && F.Q.r2 < 0.85) || (F.Q2 && F.Q2.r2 < 0.85)) t += '<p class="msg">Un R² bajo indica que los puntos no siguen bien el modelo. Revisen si alguna medición tiene un error, por ejemplo un conteo o un tiempo mal anotado.</p>';
     $('fit').innerHTML = t;
-    $('b-apply').disabled = !(F.L || F.Q);
+    $('b-apply').disabled = !(F.L || F.Q || F.Q2);
 
     var maxK = Math.max.apply(null, F.rows.map(function (r) { return r.d.k; }).concat([0]));
     var maxV = Math.max.apply(null, F.rows.map(function (r) { return r.d.v; }).concat([0]));
@@ -719,14 +741,22 @@ details ul{margin:8px 0 0;padding-left:20px}
     draw('m1', { x0: 0, x1: x1, y1: y1, xt: ticks(x1, 5), xf: f0, yf: f0, xl: 'Densidad k (veh/km)', yl: 'Velocidad v (km/h)', pts: line,
       sc: F.rows.map(function (r) { return [r.d.k, r.d.v]; }), msg: F.rows.length ? '' : 'Sin mediciones todavía', aria: 'Mediciones de velocidad frente a densidad y recta ajustada',
       at: F.L ? function (x) { var v = Math.max(0, F.L.b + F.L.m * x); return { y: v, t: f0(x) + ' veh/km → ' + f1(v) + ' km/h (ajuste)' }; } : null });
-    var y2 = Math.max(P.kj * 0.9, maxK * 1.2), pq = [];
-    if (F.Q) for (var hh = 6; hh <= 9 + 1e-9; hh += 0.03) { var u = hh - F.Q.hbar; pq.push([hh, Math.max(0, F.Q.c0 + F.Q.c1 * u + F.Q.c2 * u * u)]); }
-    draw('m2', { x0: 6, x1: 9, y1: y2, xt: [6, 6.5, 7, 7.5, 8, 8.5, 9], xf: fh, yf: f0, xl: 'Hora del día (a.m.)', yl: 'Densidad k (veh/km)', pts: pq,
-      sc: F.rows.map(function (r) { return [r.h, r.d.k]; }), msg: F.rows.length ? '' : 'Sin mediciones todavía', aria: 'Mediciones de densidad según la hora y parábola ajustada',
-      at: F.Q ? function (x) { var u2 = x - F.Q.hbar, y = Math.max(0, F.Q.c0 + F.Q.c1 * u2 + F.Q.c2 * u2 * u2); return { y: y, t: fh(x) + ' → ' + f1(y) + ' veh/km (ajuste)' }; } : null });
+    var y2 = Math.max(P.kj * 0.9, maxK * 1.2), pq = [], hh, u;
+    var curve = function (Q, a, b) { for (hh = a; hh <= b + 1e-9; hh += 0.05) { u = hh - Q.hbar; pq.push([hh, Math.max(0, Q.c0 + Q.c1 * u + Q.c2 * u * u)]); } };
+    if (F.Q) curve(F.Q, 6, 12.95);
+    if (F.Q && F.Q2) pq.push(null);
+    if (F.Q2) curve(F.Q2, 13, 20);
+    draw('m2', { x0: 6, x1: 20, y1: y2, xt: [6, 8, 10, 12, 14, 16, 18, 20], xf: fh, yf: f0, xl: 'Hora del día', yl: 'Densidad k (veh/km)', pts: pq,
+      sc: F.rows.map(function (r) { return [r.h, r.d.k]; }), msg: F.rows.length ? '' : 'Sin mediciones todavía', aria: 'Mediciones de densidad según la hora y parábolas ajustadas',
+      at: (F.Q || F.Q2) ? function (x) {
+        var Q = x < 13 ? F.Q : F.Q2;
+        if (!Q) return { y: 0, t: fh(x) + ' → sin ajuste' };
+        var u2 = x - Q.hbar, y = Math.max(0, Q.c0 + Q.c1 * u2 + Q.c2 * u2 * u2);
+        return { y: y, t: fh(x) + ' → ' + f1(y) + ' veh/km (ajuste)' };
+      } : null });
   }
   function previewMeas() {
-    var m = { count: parseFloat($('m-count').value), len: parseFloat($('m-len').value), sec: parseFloat($('m-sec').value) };
+    var m = { count: parseFloat($('m-count').value), win: 30, len: parseFloat($('m-len').value), sec: parseFloat($('m-sec').value) };
     var d = derived(m);
     $('m-prev').textContent = (isFinite(d.q) && isFinite(d.v) && isFinite(d.k))
       ? 'Esta medición da un flujo de ' + f0(d.q) + ' veh/h, una velocidad de ' + f1(d.v) + ' km/h y una densidad de ' + f1(d.k) + ' veh/km.' : '';
@@ -735,13 +765,13 @@ details ul{margin:8px 0 0;padding-left:20px}
   $('f-meas').addEventListener('submit', function (e) {
     e.preventDefault();
     var h = parseHour($('m-time').value), count = parseFloat($('m-count').value), len = parseFloat($('m-len').value), sec = parseFloat($('m-sec').value), msg = '';
-    if (!isFinite(h) || h < 6 || h > 9) msg = 'La hora debe estar entre las 6:00 y las 9:00 a.m., que es el rango del simulador.';
-    else if (!(count >= 1)) msg = 'Escriban cuántos vehículos contaron en 5 minutos.';
+    if (!isFinite(h) || h < 6 || h > 20) msg = 'La hora debe estar entre las 6:00 y las 20:00, que es el rango del simulador.';
+    else if (!(count >= 1)) msg = 'Escriban cuántos vehículos contaron en 30 minutos.';
     else if (!(len > 0)) msg = 'Escriban la longitud del tramo en kilómetros.';
     else if (!(sec > 0)) msg = 'Escriban el tiempo que tardó el vehículo en recorrer el tramo.';
     $('m-msg').textContent = msg;
     if (msg) return;
-    R.meas.push({ h: h, count: count, len: len, sec: sec, ex: false });
+    R.meas.push({ h: h, count: count, win: 30, len: len, sec: sec, ex: false });
     R.fitted = false; persist();
     $('m-count').value = ''; $('m-sec').value = ''; $('m-prev').textContent = '';
     renderMeas(); $('m-count').focus();
@@ -751,12 +781,39 @@ details ul{margin:8px 0 0;padding-left:20px}
     R.meas.splice(+b.getAttribute('data-del'), 1); persist(); renderMeas();
   });
   $('b-ex').addEventListener('click', function () {
-    var hs = [6, 6.5, 7, 7.5, 8, 8.5, 9], nz = [1.03, 0.96, 1.04, 0.97, 1.02, 0.95, 1.04];
+    var hs = [6, 6.5, 7, 7.5, 8, 8.5, 9, 16, 16.5, 17, 17.5, 18, 18.5, 19], nz = [1.03, 0.96, 1.04, 0.97, 1.02, 0.95, 1.04, 0.98, 1.03, 0.96, 1.02, 0.97, 1.04, 0.99];
     R.meas = hs.map(function (h, i) {
-      var k = 120 - 30 * Math.pow(h - 7.5, 2), v = 60 * (1 - k / 150) * nz[i];
-      return { h: h, count: Math.max(1, Math.round(k * v / 12)), len: 0.2, sec: Math.round(0.2 * 3600 / v), ex: true };
+      var k = Math.max(120 - 30 * Math.pow(h - 7.5, 2), 125 - 20 * Math.pow(h - 17.5, 2)), v = 60 * (1 - k / 150) * nz[i];
+      return { h: h, count: Math.max(1, Math.round(k * v / 2)), win: 30, len: 0.2, sec: Math.round(0.2 * 3600 / v), ex: true };
     });
     persist(); renderMeas();
+  });
+  /* Datos de referencia por vía: vehículos por 30 min (horario normal, hora pico). Sin fuente verificada. */
+  var REFROADS = {
+    'Calzada Roosevelt': [4500, 12500], 'Calzada Aguilar Batres': [4200, 10000], 'Calzada San Juan': [3800, 8500],
+    'Carretera a El Salvador': [3500, 8000], 'Bulevar Liberación': [5000, 11000], 'Avenida Petapa': [3000, 7000],
+    'Calzada Atanasio Tzul': [2500, 5500], 'Bulevar Los Próceres': [3000, 6500], 'Avenida Las Américas': [2000, 4500]
+  };
+  Object.keys(REFROADS).forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n; $('ref-road').appendChild(o); });
+  $('b-ref').addEventListener('click', function () {
+    var road = $('ref-road').value, lanes = Math.round(parseFloat($('ref-lanes').value)), ref = REFROADS[road];
+    if (!ref || !(lanes >= 1)) { $('ref-msg').textContent = 'Elijan una vía y escriban cuántos carriles tiene.'; return; }
+    var qmax = P.vf * P.kj / 4, top = 0.98 * qmax, kTop = Math.max(P.kmax, P.kmax2);
+    var hs = [6, 6.5, 7, 7.5, 8, 8.5, 9, 12, 16, 16.5, 17, 17.5, 18, 18.5, 19], capped = 0, need = 0;
+    var rows = hs.map(function (h) {
+      var sh = Math.min(1, Math.max(0, kOf(h) / kTop));
+      var q = (ref[0] + (ref[1] - ref[0]) * sh) * 2 / lanes, cap = false;
+      need = Math.max(need, q / top);
+      if (q > top) { q = top; cap = true; capped++; }
+      var disc = Math.sqrt(Math.max(0, 1 - q / qmax)), k = (P.kj / 2) * (1 + (sh > 0.5 ? 1 : -1) * disc), v = q / k;
+      return { h: h, count: Math.max(1, Math.round(q / 2)), win: 30, len: 0.2, sec: Math.max(1, Math.round(0.2 * 3600 / v)), ref: true, cap: cap, road: road };
+    });
+    R.meas = R.meas.filter(function (m) { return !m.ref && !m.ex; }).concat(rows);
+    var d0 = Math.min(Math.round(ref[0] * 2 / lanes / 50) * 50, Math.floor(0.9 * qmax / 50) * 50);
+    setVal('D0', Math.max(50, d0));
+    R.fitted = false; persist(); renderMeas();
+    $('ref-msg').textContent = 'Listo: ' + rows.length + ' filas de referencia para ' + road + ' con ' + lanes + ' carriles, y D0 = ' + f0(Math.max(50, d0)) + ' veh/h por carril. ' +
+      (capped ? 'En ' + capped + (capped === 1 ? ' fila' : ' filas') + ' el flujo por carril superaba el máximo del modelo (' + f0(qmax) + ' veh/h) y se limitó. Para que esas cifras cupieran sin limitarse harían falta unos ' + Math.ceil(need * lanes) + ' carriles; si la vía tiene menos, las cifras de referencia son demasiado altas.' : 'Ninguna fila superó el máximo del modelo.');
   });
   var clrT = null;
   $('b-clrm').addEventListener('click', function () {
@@ -769,6 +826,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     var F = computeFit(), r2 = function (x) { return Math.round(x * 100) / 100; };
     if (F.L) { setVal('vf', Math.round(F.L.vf * 10) / 10); setVal('kj', Math.round(F.L.kj * 10) / 10); }
     if (F.Q) { setVal('kmax', Math.round(F.Q.kmax * 10) / 10); setVal('hp', r2(F.Q.hp)); setVal('al', Math.round(F.Q.al * 10) / 10); }
+    if (F.Q2) { setVal('kmax2', Math.round(F.Q2.kmax * 10) / 10); setVal('hp2', r2(F.Q2.hp)); setVal('al2', Math.round(F.Q2.al * 10) / 10); }
     R.fitted = true; persist(); showTab('sim');
   });
 
