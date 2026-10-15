@@ -176,6 +176,18 @@ details ul{margin:8px 0 0;padding-left:20px}
 .url{font-size:13px;color:var(--muted);word-break:break-all;margin-bottom:12px}
 .leaflet-container{font-family:var(--body)}
 @media (max-width:700px){.ave{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}.ave .chip{flex:none}}
+/* Clima en vivo */
+.wx{background:var(--bg);border-radius:8px;padding:12px;margin-bottom:14px}
+.wx h3{font-size:16px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 6px}
+.wxt{font-size:14px;margin:0 0 10px;min-height:2.6em}
+.wxt.err{color:var(--crit)}
+.chk{display:flex;gap:8px;align-items:center;font-size:14px;margin:0 0 10px;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--accent);flex:none}
+.wx .row{margin-bottom:8px}
+.wx details{margin-top:6px;font-size:13.5px}
+.rmap{display:grid;grid-template-columns:1fr 84px;gap:6px 10px;align-items:center;margin-top:8px}
+.rmap input{text-align:right;padding:5px 8px}
+.wx .note a{color:var(--accent)}
 @media (max-width:880px){
   .app>aside{display:contents}
   .app>aside>section:first-child{order:1}
@@ -294,6 +306,22 @@ details ul{margin:8px 0 0;padding-left:20px}
       <aside class="stack">
         <section class="panel" aria-labelledby="t-esc">
           <h2 id="t-esc">Escenario</h2>
+          <div class="wx" id="wx">
+            <h3>Clima en vivo</h3>
+            <p class="wxt" id="wx-txt" aria-live="polite">Consultando el clima…</p>
+            <label class="chk" for="wx-auto"><input type="checkbox" id="wx-auto"> Aplicar la lluvia automáticamente</label>
+            <div class="row">
+              <button type="button" class="chip" id="wx-now" aria-pressed="true">Clima de ahora</button>
+              <button type="button" class="chip" id="wx-fc" aria-pressed="false">Pronóstico a la hora de salida</button>
+              <button type="button" class="chip" id="wx-refresh">Actualizar</button>
+            </div>
+            <details>
+              <summary>Cómo se convierte la lluvia en «a»</summary>
+              <p class="note" style="margin-top:6px">Son supuestos, no datos medidos. Ajústenlos con sus mediciones: midan vf en un día seco y en uno lluvioso.</p>
+              <div class="rmap" id="rmap"></div>
+            </details>
+            <p class="note" style="margin-top:8px">Datos del clima: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a>. La ubicación es el origen de la vía activa, o el centro de la ciudad si no hay origen.</p>
+          </div>
           <div class="presets" id="presets" role="group" aria-label="Escenarios de ejemplo"></div>
           <div class="ctl">
             <label for="h">Hora de salida</label><output id="o-h" for="h"></output>
@@ -302,7 +330,7 @@ details ul{margin:8px 0 0;padding-left:20px}
           </div>
           <div class="ctl">
             <label for="a">Lluvia (a)</label><output id="o-a" for="a"></output>
-            <input type="range" id="a" min="0" max="0.4" step="0.05" value="0">
+            <input type="range" id="a" min="0" max="0.4" step="0.01" value="0">
             <small>Cuánto baja la velocidad libre. 0% es día seco.</small>
           </div>
           <div class="ctl" style="margin-bottom:0">
@@ -406,8 +434,8 @@ details ul{margin:8px 0 0;padding-left:20px}
   FIELDS.forEach(function (x) { P[x.k] = x.scale ? x.def * x.scale : x.def; });
 
   /* ---------------- Datos guardados (solo en este dispositivo) ---------------- */
-  var KEY = 'redvial.v1', db = { active: null, routes: {} }, R = null, saveT;
-  function loadDb() { try { var j = JSON.parse(localStorage.getItem(KEY) || 'null'); if (j && j.routes && typeof j.routes === 'object') db = j; } catch (e) {} }
+  var KEY = 'redvial.v1', db = { active: null, routes: {} }, R = null, saveT, cfg = null;
+  function loadDb() { try { var j = JSON.parse(localStorage.getItem(KEY) || 'null'); if (j && j.routes && typeof j.routes === 'object') db = j; } catch (e) {} if (!db.cfg || typeof db.cfg !== 'object') db.cfg = {}; cfg = db.cfg; if (typeof cfg.auto !== 'boolean') cfg.auto = true; if (cfg.mode !== 'now' && cfg.mode !== 'fc') cfg.mode = 'now'; if (!Array.isArray(cfg.rain) || cfg.rain.length !== 4 || !cfg.rain.every(isFinite)) cfg.rain = [0, 0.1, 0.2, 0.3]; }
   function flush() { clearTimeout(saveT); try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} }
   function persist() { clearTimeout(saveT); saveT = setTimeout(flush, 250); }
   window.addEventListener('pagehide', flush);
@@ -451,7 +479,7 @@ details ul{margin:8px 0 0;padding-left:20px}
   PRESETS.forEach(function (p, i) {
     var b = document.createElement('button');
     b.type = 'button'; b.className = 'chip'; b.textContent = p.n; b.id = 'pre-' + i;
-    b.addEventListener('click', function () { setScenario(p.a, p.c, p.h); });
+    b.addEventListener('click', function () { cfg.auto = false; syncWxUi(); persist(); setScenario(p.a, p.c, p.h); if (typeof applyWx === 'function') applyWx(); });
     pr.appendChild(b);
   });
   function setScenario(a, c, h) {
@@ -463,6 +491,8 @@ details ul{margin:8px 0 0;padding-left:20px}
     $(id).addEventListener('input', function () {
       S[id] = parseFloat($(id).value);
       if (R) { R.S = { a: S.a, c: S.c, h: S.h }; persist(); }
+      if (id === 'a' && cfg.auto) { cfg.auto = false; syncWxUi(); persist(); applyWx(); }
+      else if (id === 'h' && cfg.auto && cfg.mode === 'fc') applyWx();
       renderSim();
     });
   });
@@ -879,6 +909,96 @@ details ul{margin:8px 0 0;padding-left:20px}
   });
   $('go-meds').addEventListener('click', function () { showTab('meds'); });
 
+
+  /* ---------------- Clima en vivo (Open-Meteo) ---------------- */
+  var WXC = ['sin lluvia', 'lluvia ligera', 'lluvia moderada', 'lluvia fuerte'];
+  var wx = null, wxBusy = false;
+  function rainClass(mm) { return mm < 0.1 ? 0 : mm < 2.5 ? 1 : mm < 7.6 ? 2 : 3; }
+  function codeText(c) {
+    if (c === 0) return 'despejado';
+    if (c === 1) return 'mayormente despejado';
+    if (c === 2) return 'parcialmente nublado';
+    if (c === 3) return 'nublado';
+    if (c === 45 || c === 48) return 'niebla';
+    if (c >= 51 && c <= 57) return 'llovizna';
+    if (c >= 61 && c <= 67) return 'lluvia';
+    if (c >= 80 && c <= 82) return 'chubascos';
+    if (c >= 95) return 'tormenta';
+    return 'sin dato del cielo';
+  }
+  function setWxText(t, err) { var e = $('wx-txt'); e.textContent = t; e.className = 'wxt' + (err ? ' err' : ''); }
+  function syncWxUi() {
+    $('wx-auto').checked = cfg.auto;
+    $('wx-now').setAttribute('aria-pressed', cfg.mode === 'now' ? 'true' : 'false');
+    $('wx-fc').setAttribute('aria-pressed', cfg.mode === 'fc' ? 'true' : 'false');
+    for (var i = 0; i < 4; i++) $('rm-' + i).value = Math.round(cfg.rain[i] * 100);
+  }
+  function wxLoc() { return (R && R.o) ? R.o : GT; }
+  function fetchWx(force) {
+    var loc = wxLoc();
+    if (!force && wx && Date.now() - wx.t < 600000 && haversine([wx.lat, wx.lng], loc) < 3) return Promise.resolve(wx);
+    if (wxBusy) return Promise.resolve(wx);
+    wxBusy = true; setWxText('Consultando el clima…');
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + loc[0].toFixed(3) + '&longitude=' + loc[1].toFixed(3) +
+      '&current=temperature_2m,precipitation,weather_code&hourly=precipitation,precipitation_probability&forecast_days=2&timezone=auto';
+    var ctl = new AbortController(), to = setTimeout(function () { ctl.abort(); }, 10000);
+    return fetch(url, { signal: ctl.signal }).then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); }).then(function (j) {
+      if (!j || !j.current || !j.hourly || !Array.isArray(j.hourly.time) || !Array.isArray(j.hourly.precipitation) || typeof j.current.time !== 'string') throw new Error('formato');
+      wx = { t: Date.now(), lat: loc[0], lng: loc[1],
+        cur: { time: j.current.time, temp: j.current.temperature_2m, precip: +j.current.precipitation || 0, code: j.current.weather_code },
+        hourly: { time: j.hourly.time, precip: j.hourly.precipitation, prob: Array.isArray(j.hourly.precipitation_probability) ? j.hourly.precipitation_probability : [] } };
+      return wx;
+    }).catch(function () {
+      setWxText('No se pudo obtener el clima (sin conexión o servicio ocupado). Usen el control de lluvia a mano.', true);
+      return null;
+    }).then(function (w) { clearTimeout(to); wxBusy = false; return w; });
+  }
+  function pickWx() {
+    var c = wx.cur;
+    if (cfg.mode === 'now') {
+      return { mm: c.precip, text: 'Ahora: ' + codeText(c.code) + ', ' + f1(c.precip) + ' mm/h' + (isFinite(c.temp) ? ', ' + f0(c.temp) + ' °C' : '') };
+    }
+    var hr = Math.floor(S.h + 1e-9), p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+    var day = c.time.slice(0, 10), cand = day + 'T' + p2(hr) + ':00', tomorrow = false;
+    if (cand < c.time.slice(0, 13) + ':00') {
+      var d = new Date(day + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1);
+      day = d.toISOString().slice(0, 10); cand = day + 'T' + p2(hr) + ':00'; tomorrow = true;
+    }
+    var i = wx.hourly.time.indexOf(cand);
+    if (i < 0 || !isFinite(wx.hourly.precip[i])) return null;
+    var pr = wx.hourly.prob[i];
+    return { mm: +wx.hourly.precip[i], text: 'Pronóstico para ' + (tomorrow ? 'mañana' : 'hoy') + ' a las ' + hr + ':00: ' + f1(wx.hourly.precip[i]) + ' mm/h' + (isFinite(pr) ? ', probabilidad de lluvia ' + f0(pr) + '%' : '') };
+  }
+  function applyWx() {
+    if (!wx) return;
+    var p = pickWx();
+    if (!p) { setWxText('No hay pronóstico para esa hora de salida.', true); return; }
+    var cls = rainClass(p.mm), a = cfg.rain[cls];
+    setWxText(p.text + '. Se considera ' + WXC[cls] + ' y le corresponde a = ' + f0(a * 100) + '%' + (cfg.auto ? '.' : ' (no aplicada: la lluvia está en manual).'));
+    if (cfg.auto && Math.abs(S.a - a) > 1e-9) {
+      S.a = a; $('a').value = a;
+      if (R) { R.S = { a: S.a, c: S.c, h: S.h }; persist(); }
+      renderSim();
+    }
+  }
+  function ensureWx(force) { return fetchWx(!!force).then(function (w) { if (w) applyWx(); }); }
+  (function () {
+    var box = $('rmap'), names = ['Sin lluvia (menos de 0.1 mm/h)', 'Lluvia ligera (hasta 2.5 mm/h)', 'Lluvia moderada (2.5 a 7.6 mm/h)', 'Lluvia fuerte (más de 7.6 mm/h)'];
+    names.forEach(function (n, i) {
+      var l = document.createElement('label'); l.htmlFor = 'rm-' + i; l.textContent = n + ' → a (%)';
+      var inp = document.createElement('input'); inp.type = 'number'; inp.id = 'rm-' + i; inp.min = 0; inp.max = 40; inp.step = 1; inp.inputMode = 'decimal';
+      inp.addEventListener('input', function () {
+        var v = parseFloat(inp.value);
+        if (isFinite(v) && v >= 0 && v <= 40) { cfg.rain[i] = v / 100; persist(); applyWx(); }
+      });
+      box.appendChild(l); box.appendChild(inp);
+    });
+    $('wx-auto').addEventListener('change', function () { cfg.auto = $('wx-auto').checked; persist(); if (cfg.auto) { if (wx) applyWx(); else ensureWx(); } else if (wx) applyWx(); });
+    $('wx-now').addEventListener('click', function () { cfg.mode = 'now'; syncWxUi(); persist(); if (wx) applyWx(); else ensureWx(); });
+    $('wx-fc').addEventListener('click', function () { cfg.mode = 'fc'; syncWxUi(); persist(); if (wx) applyWx(); else ensureWx(); });
+    $('wx-refresh').addEventListener('click', function () { ensureWx(true); });
+  })();
+
   /* ---------------- Pestañas ---------------- */
   var TABS = ['mapa', 'meds', 'sim'];
   function showTab(id) {
@@ -889,7 +1009,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     try { history.replaceState(null, '', '#' + id); } catch (e) {}
     if (id === 'mapa' && map) setTimeout(function () { map.invalidateSize(); }, 30);
     if (id === 'meds') renderMeas();
-    if (id === 'sim') renderSim();
+    if (id === 'sim') { renderSim(); ensureWx(false); }
     window.scrollTo(0, 0);
   }
   TABS.forEach(function (t, i) {
@@ -928,6 +1048,7 @@ details ul{margin:8px 0 0;padding-left:20px}
 
   /* ---------------- Inicio ---------------- */
   loadDb();
+  syncWxUi();
   initMap();
   var names = Object.keys(db.routes);
   if (!names.length) { db.routes['Mi vía'] = newRoute(); names = ['Mi vía']; }
