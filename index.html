@@ -257,9 +257,10 @@ details ul{margin:8px 0 0;padding-left:20px}
         <p style="margin-bottom:10px">Elijan la vía y la app llena sola las mediciones de 6:00 a 19:30 y la demanda D0 del simulador, sin contar ni cronometrar.</p>
         <div class="mform">
           <div class="fld"><label for="ref-road">Vía</label><select id="ref-road"></select></div>
-          <div class="fld"><label for="ref-lanes">Carriles de la vía (todos los sentidos)</label><input id="ref-lanes" type="number" inputmode="numeric" min="1" max="16" step="1" value="6"></div>
+          <div class="fld"><label for="ref-lanes">Carriles (todos los sentidos, estimado)</label><input id="ref-lanes" type="number" inputmode="numeric" min="1" max="16" step="1" value="6"></div>
           <button class="btn" id="b-ref" type="button">Autollenar</button>
         </div>
+        <p class="note" style="margin-top:8px">Los carriles se llenan solos con un valor estimado por vía (no verificado). Cámbienlo si la vía tiene otra cantidad.</p>
         <p class="msg" id="ref-msg" role="status"></p>
         <p class="note" style="margin-top:8px"><strong>Importante:</strong> los conteos de referencia por vía (por cada 30 min, en horario normal y en hora pico) fueron proporcionados por el equipo y no tienen una fuente verificada. Se reparten entre los carriles que escriban, y el valor por carril se limita al máximo del modelo. La velocidad no es una medición: la calcula el modelo a partir del flujo. Por eso estas filas se marcan «referencia», no entran al ajuste y no sustituyen una medición en campo. Declárenlo así en el informe (sección 9).</p>
       </div>
@@ -280,6 +281,7 @@ details ul{margin:8px 0 0;padding-left:20px}
           <div class="fld"><label for="m-sec">Tiempo del tramo (s)</label><input id="m-sec" type="number" inputmode="decimal" min="1" step="1" placeholder="Ej. 24"></div>
           <button class="btn" type="submit">Agregar</button>
         </form>
+        <p class="note" id="m-auto" style="margin-top:8px"></p>
         <p class="note" id="m-prev" style="margin-top:8px"></p>
         <p class="msg" id="m-msg" role="alert"></p>
       </div>
@@ -771,9 +773,10 @@ details ul{margin:8px 0 0;padding-left:20px}
     else if (!(sec > 0)) msg = 'Escriban el tiempo que tardó el vehículo en recorrer el tramo.';
     $('m-msg').textContent = msg;
     if (msg) return;
-    R.meas.push({ h: h, count: count, win: 30, len: len, sec: sec, ex: false });
+    var isAuto = auto && count === auto.count && len === auto.len && sec === auto.sec;
+    R.meas.push({ h: h, count: count, win: 30, len: len, sec: sec, ex: false, ref: !!isAuto, cap: !!(isAuto && auto.cap), road: isAuto ? auto.road : undefined });
     R.fitted = false; persist();
-    $('m-count').value = ''; $('m-sec').value = ''; $('m-prev').textContent = '';
+    $('m-count').value = ''; $('m-sec').value = ''; $('m-prev').textContent = ''; $('m-auto').textContent = ''; auto = null;
     renderMeas(); $('m-count').focus();
   });
   $('mt').addEventListener('click', function (e) {
@@ -794,19 +797,40 @@ details ul{margin:8px 0 0;padding-left:20px}
     'Carretera a El Salvador': [3500, 8000], 'Bulevar Liberación': [5000, 11000], 'Avenida Petapa': [3000, 7000],
     'Calzada Atanasio Tzul': [2500, 5500], 'Bulevar Los Próceres': [3000, 6500], 'Avenida Las Américas': [2000, 4500]
   };
+  var LANES = { 'Calzada Roosevelt': 6, 'Calzada Aguilar Batres': 6, 'Calzada San Juan': 4, 'Carretera a El Salvador': 6, 'Bulevar Liberación': 6,
+    'Avenida Petapa': 4, 'Calzada Atanasio Tzul': 4, 'Bulevar Los Próceres': 6, 'Avenida Las Américas': 4 };
+  function refRow(h, road, lanes) {
+    var ref = REFROADS[road], qmax = P.vf * P.kj / 4, top = 0.98 * qmax, kTop = Math.max(P.kmax, P.kmax2);
+    var sh = Math.min(1, Math.max(0, kOf(h) / kTop));
+    var q = (ref[0] + (ref[1] - ref[0]) * sh) * 2 / lanes, cap = false, need = q / top;
+    if (q > top) { q = top; cap = true; }
+    var disc = Math.sqrt(Math.max(0, 1 - q / qmax)), k = (P.kj / 2) * (1 + (sh > 0.5 ? 1 : -1) * disc), v = q / k;
+    return { h: h, count: Math.max(1, Math.round(q / 2)), win: 30, len: 0.2, sec: Math.max(1, Math.round(0.2 * 3600 / v)), ref: true, cap: cap, road: road, need: need };
+  }
+  var auto = null;
+  function fillAuto() {
+    var h = parseHour($('m-time').value), road = $('ref-road').value, lanes = Math.round(parseFloat($('ref-lanes').value));
+    if (!isFinite(h) || h < 6 || h > 20 || !REFROADS[road] || !(lanes >= 1)) { auto = null; $('m-auto').textContent = ''; if (isFinite(h) && (h < 6 || h > 20)) { $('m-count').value = ''; $('m-sec').value = ''; } return; }
+    var r = refRow(h, road, lanes);
+    $('m-count').value = r.count; $('m-len').value = r.len; $('m-sec').value = r.sec;
+    auto = { count: r.count, len: r.len, sec: r.sec, cap: r.cap, road: road };
+    $('m-auto').textContent = 'Valores de referencia para ' + road + ' (' + lanes + ' carriles) a las ' + fh(h) + '. Si miden en campo, escriban sus propios valores y la medición contará como real.';
+    previewMeas();
+  }
+  function setLanes() { $('ref-lanes').value = LANES[$('ref-road').value] || 6; fillAuto(); }
+  $('ref-road').addEventListener('change', setLanes);
+  $('ref-lanes').addEventListener('input', fillAuto);
+  $('m-time').addEventListener('input', fillAuto);
+  $('m-time').addEventListener('change', fillAuto);
   Object.keys(REFROADS).forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n; $('ref-road').appendChild(o); });
+  $('ref-road').value = 'Calzada Roosevelt'; setLanes();
   $('b-ref').addEventListener('click', function () {
     var road = $('ref-road').value, lanes = Math.round(parseFloat($('ref-lanes').value)), ref = REFROADS[road];
     if (!ref || !(lanes >= 1)) { $('ref-msg').textContent = 'Elijan una vía y escriban cuántos carriles tiene.'; return; }
-    var qmax = P.vf * P.kj / 4, top = 0.98 * qmax, kTop = Math.max(P.kmax, P.kmax2);
-    var hs = [6, 6.5, 7, 7.5, 8, 8.5, 9, 12, 16, 16.5, 17, 17.5, 18, 18.5, 19], capped = 0, need = 0;
+    var qmax = P.vf * P.kj / 4, top = 0.98 * qmax, capped = 0, need = 0;
+    var hs = [6, 6.5, 7, 7.5, 8, 8.5, 9, 12, 16, 16.5, 17, 17.5, 18, 18.5, 19];
     var rows = hs.map(function (h) {
-      var sh = Math.min(1, Math.max(0, kOf(h) / kTop));
-      var q = (ref[0] + (ref[1] - ref[0]) * sh) * 2 / lanes, cap = false;
-      need = Math.max(need, q / top);
-      if (q > top) { q = top; cap = true; capped++; }
-      var disc = Math.sqrt(Math.max(0, 1 - q / qmax)), k = (P.kj / 2) * (1 + (sh > 0.5 ? 1 : -1) * disc), v = q / k;
-      return { h: h, count: Math.max(1, Math.round(q / 2)), win: 30, len: 0.2, sec: Math.max(1, Math.round(0.2 * 3600 / v)), ref: true, cap: cap, road: road };
+      var r = refRow(h, road, lanes); need = Math.max(need, r.need); if (r.cap) capped++; return r;
     });
     R.meas = R.meas.filter(function (m) { return !m.ref && !m.ex; }).concat(rows);
     var d0 = Math.min(Math.round(ref[0] * 2 / lanes / 50) * 50, Math.floor(0.9 * qmax / 50) * 50);
