@@ -822,6 +822,8 @@ details ul{margin:8px 0 0;padding-left:20px}
   $('ref-lanes').addEventListener('input', fillAuto);
   $('m-time').addEventListener('input', fillAuto);
   $('m-time').addEventListener('change', fillAuto);
+  $('m-time').addEventListener('blur', function () { if (!$('m-count').value && !$('m-sec').value) fillAuto(); });
+  $('m-count').addEventListener('focus', function () { if (!$('m-count').value && !$('m-sec').value) fillAuto(); });
   Object.keys(REFROADS).forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n; $('ref-road').appendChild(o); });
   $('ref-road').value = 'Calzada Roosevelt'; setLanes();
   $('b-ref').addEventListener('click', function () {
@@ -1090,7 +1092,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     });
     try { history.replaceState(null, '', '#' + id); } catch (e) {}
     if (id === 'mapa' && map) setTimeout(function () { map.invalidateSize(); }, 30);
-    if (id === 'meds') renderMeas();
+    if (id === 'meds') { renderMeas(); if (!$('m-count').value && !$('m-sec').value) fillAuto(); }
     if (id === 'sim') { renderSim(); ensureWx(false); }
     window.scrollTo(0, 0);
   }
