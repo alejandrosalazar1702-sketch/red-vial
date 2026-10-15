@@ -1139,7 +1139,19 @@ details ul{margin:8px 0 0;padding-left:20px}
   activate(db.routes[db.active] ? db.active : names[0]);
   var hash = (location.hash || '').replace('#', '');
   if (TABS.indexOf(hash) > 0) showTab(hash);
-  if (('serviceWorker' in navigator) && location.protocol.indexOf('http') === 0) navigator.serviceWorker.register('sw.js').catch(function () {});
+  if (('serviceWorker' in navigator) && location.protocol.indexOf('http') === 0) {
+    /* Se actualiza sola: busca una versión nueva al abrir y cada vez que vuelven a la app, y recarga una vez si la encuentra. */
+    var hadSW = !!navigator.serviceWorker.controller, reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!hadSW || reloaded) { hadSW = true; return; }
+      reloaded = true; try { flush(); } catch (e) {} location.reload();
+    });
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+      var chk = function () { reg.update().catch(function () {}); };
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) chk(); });
+      setInterval(chk, 5 * 60 * 1000);
+    }).catch(function () {});
+  }
 })();
 </script>
 </body>

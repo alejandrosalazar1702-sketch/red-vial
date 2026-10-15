@@ -1,5 +1,5 @@
 /* Guarda la app para abrirla sin conexión. Los mapas y las rutas siguen necesitando internet. */
-var V = 'redvial-v1';
+var V = 'redvial-v3';
 var SHELL = ['./', 'index.html', 'model.js', 'manifest.webmanifest',
   'vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css', 'vendor/qrcode.js',
   'icons/icon-192.png', 'icons/icon-512.png'];
@@ -14,11 +14,12 @@ self.addEventListener('activate', function (e) {
 self.addEventListener('fetch', function (e) {
   var r = e.request, u = new URL(r.url);
   if (r.method !== 'GET' || u.origin !== self.location.origin) return;
-  e.respondWith(caches.match(r).then(function (hit) {
-    return hit || fetch(r).then(function (res) {
-      var copy = res.clone();
-      caches.open(V).then(function (c) { c.put(r, copy); });
-      return res;
-    }).catch(function () { return r.mode === 'navigate' ? caches.match('index.html') : Promise.reject(); });
+  /* Primero la red (sin usar la copia temporal del navegador), para que una versión nueva se vea enseguida; sin conexión, la copia guardada. */
+  e.respondWith(fetch(r.url, { cache: 'no-cache', credentials: 'same-origin' }).then(function (res) {
+    var copy = res.clone();
+    caches.open(V).then(function (c) { c.put(r, copy); });
+    return res;
+  }).catch(function () {
+    return caches.match(r).then(function (hit) { return hit || (r.mode === 'navigate' ? caches.match('index.html') : Promise.reject()); });
   }));
 });
