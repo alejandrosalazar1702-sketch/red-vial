@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Red vial</title>
-<meta name="description" content="Modelo matemático del tráfico en la Ciudad de Guatemala: elige una vía, registra mediciones y simula el tiempo de viaje.">
-<meta name="theme-color" content="#0A6C98">
+<title>FlyQ</title>
+<meta name="description" content="FlyQ, el vuelo del quetzal: rutas y tráfico estimado en la Ciudad de Guatemala con un modelo matemático.">
+<meta name="theme-color" content="#0B6B48">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -16,22 +16,22 @@
 <style>
 /* Concepto: app de campo. Mapa para elegir la vía, mediciones para alimentar el modelo, simulador para leer el resultado. Rotulación de señal vial (Barlow Condensed) sobre texto técnico (IBM Plex Sans). */
 :root{
-  --bg:#F3F5F6; --surface:#FFFFFF; --ink:#14202B; --muted:#56646F; --line:#D8DEE3;
-  --accent:#0A6C98; --accent-ink:#FFFFFF; --accent-soft:#DCEEF6; --crit:#B3261E; --crit-soft:#FBE7E4; --ok:#1B7A4B;
+  --bg:#F1F7F3; --surface:#FFFFFF; --ink:#12241D; --muted:#4F6459; --line:#D3E2DA;
+  --accent:#0B6B48; --accent-ink:#FFFFFF; --accent-soft:#DDF1E7; --crit:#C8222F; --crit-soft:#FBE7E4; --ok:#1B7A4B; --gold:#E0A91F; --teal:#17A2A8;
   --display:'Barlow Condensed','Arial Narrow',sans-serif;
   --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0E151B; --surface:#151F28; --ink:#E5ECF2; --muted:#93A1AD; --line:#2A3743;
-    --accent:#52B6E3; --accent-ink:#0E151B; --accent-soft:#16384A; --crit:#FF8B80; --crit-soft:#3B1F1D; --ok:#5CCB92;
+    --bg:#09150F; --surface:#10231B; --ink:#E4F2EA; --muted:#8FA99B; --line:#24402F;
+    --accent:#3DD598; --accent-ink:#06130D; --accent-soft:#15382A; --crit:#FF8B80; --crit-soft:#3B1F1D; --ok:#5CCB92; --gold:#F2C14E; --teal:#4FD1D6;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0E151B; --surface:#151F28; --ink:#E5ECF2; --muted:#93A1AD; --line:#2A3743;
-  --accent:#52B6E3; --accent-ink:#0E151B; --accent-soft:#16384A; --crit:#FF8B80; --crit-soft:#3B1F1D; --ok:#5CCB92;
+  --bg:#09150F; --surface:#10231B; --ink:#E4F2EA; --muted:#8FA99B; --line:#24402F;
+  --accent:#3DD598; --accent-ink:#06130D; --accent-soft:#15382A; --crit:#FF8B80; --crit-soft:#3B1F1D; --ok:#5CCB92; --gold:#F2C14E; --teal:#4FD1D6;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -40,11 +40,14 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font
   padding-inline:16px;padding-block:calc(14px + env(safe-area-inset-top,0px)) 40px}
 .wrap{max-width:1120px;margin-inline:auto}
 h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,6vw,42px);line-height:1;letter-spacing:.01em;margin:0;text-transform:uppercase}
+h1{display:flex;align-items:center;gap:10px}
+h1 b{color:var(--gold)}
+.logo{flex:none}
 h2{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 10px}
 h3{font-family:var(--display);font-weight:600;font-size:18px;letter-spacing:.03em;margin:0}
 p{margin:0}
 .top{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end;justify-content:space-between;padding-bottom:14px;margin-bottom:14px;
-  background:linear-gradient(90deg,var(--muted) 0 14px,transparent 14px 26px) repeat-x left bottom/26px 2px}
+  background:linear-gradient(90deg,var(--gold) 0 14px,transparent 14px 26px) repeat-x left bottom/26px 2px}
 .brand p{color:var(--muted);margin-top:4px}
 .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .pill{font-size:13px;background:var(--accent-soft);color:var(--ink);border-radius:999px;padding:4px 12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -79,18 +82,18 @@ body:not(.team) .tabs,body:not(.team) #ave,body:not(.team) #vpanel,body:not(.tea
 body:not(.team) .top .brand p{display:none}
 .lockmsg{display:none;margin:0 0 12px;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
 body.lock .lockmsg{display:block}
-#navpanel{border-top:4px solid #6B2FD6}
+#navpanel{border-top:4px solid var(--accent);background:linear-gradient(180deg,var(--accent-soft),var(--surface) 90px)}
 .od{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
 .od>div{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:14.5px}
 .od .dot{width:12px;height:12px;border-radius:50%;flex:none}
 .od .dot.a{background:#1F6FEB;box-shadow:0 0 0 4px rgba(31,111,235,.25)}
 .od .dot.b{background:#D93025;box-shadow:0 0 0 4px rgba(217,48,37,.2)}
-.btn.go{font-size:16px;padding:10px 20px;background:#6B2FD6;border-color:#6B2FD6;color:#fff}
+.btn.go{font-size:16px;padding:10px 20px;background:linear-gradient(135deg,#0B6B48,#17A2A8);border-color:#0B6B48;color:#fff}
 .rt{margin-top:10px;border:1px solid var(--line);border-left-width:6px;border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--surface)}
 .rt.v-ok{border-left-color:#1B9E5A}.rt.v-mid{border-left-color:#E0A100}.rt.v-bad{border-left-color:#D93025}
-.rt.sel{box-shadow:0 0 0 2px #6B2FD6;background:var(--accent-soft)}
+.rt.sel{box-shadow:0 0 0 2px var(--accent);background:var(--accent-soft)}
 .rt-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.rt-n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#6B2FD6;color:#fff;font-weight:700;font-size:13px}
+.rt-n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:13px}
 .rt-min{font-size:22px}
 .rt-arr{font-size:13px;color:var(--muted)}
 .rt-best{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.05em;color:#fff;background:#1B9E5A;border-radius:4px;padding:2px 7px}
@@ -98,7 +101,7 @@ body.lock .lockmsg{display:block}
 .rt-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .tag{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--muted)}
 .tag.ok{background:#1B9E5A;border-color:#1B9E5A;color:#fff}.tag.mid{background:#E0A100;border-color:#E0A100;color:#1b1b1b}.tag.bad{background:#D93025;border-color:#D93025;color:#fff}
-.rt-more{margin-top:8px;font:inherit;font-size:13px;color:#6B2FD6;background:none;border:0;padding:2px 0;cursor:pointer;text-decoration:underline}
+.rt-more{margin-top:8px;font:inherit;font-size:13px;color:var(--accent);background:none;border:0;padding:2px 0;cursor:pointer;text-decoration:underline}
 .rt-det{margin-top:8px;border-top:1px dashed var(--line);padding-top:8px}
 .rt-roads{margin:4px 0 0;padding-left:20px;font-size:13.5px}.rt-roads li span{color:var(--muted);font-size:12.5px}
 .viaf{display:flex;gap:8px;margin-top:12px}.viaf input{flex:1;min-width:0}
@@ -245,8 +248,8 @@ details ul{margin:8px 0 0;padding-left:20px}
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <h1>Red vial</h1>
-      <p>Modelo de tráfico para la Ciudad de Guatemala</p>
+      <h1><svg class="logo" viewBox="0 0 48 48" width="40" height="40" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0B6B48"/><stop offset="1" stop-color="#17A2A8"/></linearGradient></defs><rect width="48" height="48" rx="11" fill="url(#lg)"/><path d="M10 38C13 20 29 24 40 10" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/><path d="M9 42C16 26 31 31 43 17" fill="none" stroke="#F2C14E" stroke-width="1.8" stroke-linecap="round"/><circle cx="40" cy="10" r="3.6" fill="#D62F3A"/></svg><span>Fly<b>Q</b></span></h1>
+      <p>Vuelo del Quetzal · rutas y tráfico en la Ciudad de Guatemala</p>
     </div>
     <div class="acts">
       <span class="pill" id="pill"></span>
@@ -303,6 +306,7 @@ details ul{margin:8px 0 0;padding-left:20px}
             <button class="btn sec bad" id="nav-stop" type="button" hidden>Detener</button>
             <button class="btn sec" id="nav-new" type="button" hidden>Nueva ruta</button>
           </div>
+          <div class="fld hide-user" style="margin-top:10px"><label for="urb-f">Factor urbano del tiempo (calibrado con Waze: 2.0)</label><input id="urb-f" type="number" min="1" max="4" step="0.1" value="2"></div>
           <form class="viaf hide-user" id="via-f"><input id="via-q" type="search" placeholder="Pasar por una vía (ej. Bulevar El Naranjo)" aria-label="Pasar por una vía" autocomplete="off"><button class="btn sec" type="submit">Agregar</button></form>
           <div class="note hide-user" id="via-msg"></div>
           <div class="navst" id="nav-st" aria-live="polite" hidden></div>
@@ -1049,7 +1053,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     if (R.o) icon(R.o, '🚗', 'Salida', [17, 17]);
     if (R.dst) icon(R.dst, '🏁', 'Meta', [9, 30]);
     if (R.info && R.info.geom) {
-      routeLayer = L.geoJSON({ type: 'LineString', coordinates: R.info.geom }, { style: { color: '#0A6C98', weight: 6, opacity: 0.85 } }).addTo(map);
+      routeLayer = L.geoJSON({ type: 'LineString', coordinates: R.info.geom }, { style: { color: '#0B6B48', weight: 6, opacity: 0.85 } }).addTo(map);
     }
   }
   function renderRoute() {
@@ -1162,23 +1166,27 @@ details ul{margin:8px 0 0;padding-left:20px}
   function fmtH(x) { x = mod24(x); var hh = Math.floor(x), mm = Math.round((x - hh) * 60); if (mm === 60) { hh = (hh + 1) % 24; mm = 0; } return hh + ':' + (mm < 10 ? '0' : '') + mm; }
   /* «Llegar a las»: hora de salida tal que salida + tiempo de viaje con el tráfico de esa hora = hora de llegada. */
   function navDepFor(rt, arr) {
-    var dep = arr - rt.min / 60, i;
+    var dep = arr - rt.min * urbF() / 60, i;
     for (i = 0; i < 8; i++) dep = arr - navEst(rt, mod24(dep)).min / 60;
     return dep;
   }
   function navModeUi() { $('nav-hour').hidden = navMode() === 'now'; if (navMode() !== 'now' && !$('nav-hour').value) { var t = nowH(); $('nav-hour').value = fmtH(t).replace(/^(\d):/, '0$1:'); } }
+  $('urb-f').addEventListener('change', function () { if (NAV.on) navCheck('hora'); else navPreview(); });
   $('nav-mode').addEventListener('change', function () { navModeUi(); if (NAV.on) navCheck('hora'); else navPreview(); });
   $('nav-hour').addEventListener('change', function () { if (NAV.on) navCheck('hora'); else navPreview(); });
   function navSay(cls, title, body) { var el = $('nav-st'); el.hidden = false; el.className = 'navst ' + cls; el.innerHTML = '<b>' + title + '</b>' + body; }
   /* Tiempo estimado con tráfico: cada tramo con la velocidad que da el modelo para esa vía y esa hora. */
+  /* El mapa da tiempos «de límite de velocidad»; en la ciudad (semáforos, giros, calles saturadas) se tarda más.
+     Calibración: el 22/10/2026 a las 20:33 Waze dio 29, 30 y 33 min para rutas de 11.3 a 11.7 km, y el mapa solo 14–15 min: factor ≈ 2. */
+  function urbF() { var f = parseFloat($('urb-f').value); return f >= 1 && f <= 4 ? f : 2; }
   function navEst(rt, h) {
-    var v0 = (1 - S.a) * P.vf, vg = vK(kOf(h), S.a, S.c), gf = vg > 0 ? Math.min(3.5, v0 / vg) : 3.5, tot = 0, sat = 0, free = 0;
+    var U = urbF(), v0 = (1 - S.a) * P.vf, vg = vK(kOf(h), S.a, S.c), gf = vg > 0 ? Math.min(3.5, v0 / vg) : 3.5, tot = 0, sat = 0, free = 0;
     rt.steps.forEach(function (st) {
-      free += st.dur;
-      var key = roadKey(st.name), t = st.dur * gf;
+      var base = st.dur * U, key = roadKey(st.name), t = base * gf;
+      free += base;
       if (key && st.dist > 30) {
-        var r = refRow(h, key, LANES[key] || 4, st.dist / 1000, st.name);
-        t = Math.max(st.dur, r.sec);
+        var r = refRow(h, key, LANES[key] || 4, st.dist / 1000, st.name), fm = st.dist / 1000 / v0 * 3600;
+        t = base * Math.max(1, fm > 0 ? r.sec / fm : 1);
         if (r.need > 1.3) sat += st.dist;
       } else if (vg <= 0) sat += st.dist;
       tot += t;
@@ -1214,13 +1222,13 @@ details ul{margin:8px 0 0;padding-left:20px}
     NAV.layer = L.layerGroup().addTo(map);
     NAV.routes.forEach(function (r, i) {
       if (i === NAV.cur) return;
-      L.polyline(r.geom.map(function (p) { return [p[1], p[0]]; }), { color: '#B79AF0', weight: 6, opacity: 0.85 }).addTo(NAV.layer);
+      L.polyline(r.geom.map(function (p) { return [p[1], p[0]]; }), { color: '#7FD1C3', weight: 6, opacity: 0.9 }).addTo(NAV.layer);
     });
     var r = NAV.routes[NAV.cur];
     if (r) {
       var ll = r.geom.map(function (p) { return [p[1], p[0]]; });
       L.polyline(ll, { color: '#fff', weight: 11, opacity: 0.9 }).addTo(NAV.layer);
-      L.polyline(ll, { color: '#6B2FD6', weight: 7, opacity: 1 }).addTo(NAV.layer);
+      L.polyline(ll, { color: '#0B6B48', weight: 7, opacity: 1 }).addTo(NAV.layer);
     }
     if (NAV.pos && NAV.on) L.circleMarker(NAV.pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#1F6FEB', fillOpacity: 1 }).bindTooltip('Ustedes', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(NAV.layer);
   }
