@@ -79,6 +79,8 @@ body:not(.team) .tabs,body:not(.team) #ave,body:not(.team) #vpanel,body:not(.tea
 body:not(.team) .top .brand p{display:none}
 .lockmsg{display:none;margin:0 0 12px;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
 body.lock .lockmsg{display:block}
+.emo{background:none;border:0}
+.emo span{display:block;font-size:30px;line-height:34px;text-align:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
 .sugg{display:flex;flex-direction:column;margin-top:6px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .sugg button{font:inherit;font-size:14px;text-align:left;color:var(--ink);background:var(--surface);border:0;border-bottom:1px solid var(--line);padding:10px 12px;cursor:pointer}
 .sugg button:last-child{border-bottom:0}
@@ -272,6 +274,7 @@ details ul{margin:8px 0 0;padding-left:20px}
             <button class="btn" id="nav-go" type="button">Iniciar con GPS</button>
             <button class="btn sec hide-user" id="nav-sim" type="button">Simular recorrido</button>
             <button class="btn sec bad" id="nav-stop" type="button" hidden>Detener</button>
+            <button class="btn sec" id="nav-new" type="button" hidden>Nueva ruta</button>
           </div>
           <div class="navst" id="nav-st" aria-live="polite" hidden></div>
           <div id="nav-alts"></div>
@@ -998,14 +1001,19 @@ details ul{margin:8px 0 0;padding-left:20px}
     return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
   }
   function drawMap() {
+    $('nav-new').hidden = !(R && (R.o || R.dst));
     if (!map) return;
     markers.clearLayers();
     if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
     function dot(ll, color, label) {
       L.circleMarker(ll, { radius: 9, color: '#fff', weight: 3, fillColor: color, fillOpacity: 1 }).bindTooltip(label, { permanent: true, direction: 'top', offset: [0, -8] }).addTo(markers);
     }
-    if (R.o) dot(R.o, '#1B7A4B', 'Origen');
-    if (R.dst) dot(R.dst, '#B3261E', 'Destino');
+    function icon(ll, emoji, label, anchor) {
+      L.marker(ll, { icon: L.divIcon({ className: 'emo', html: '<span>' + emoji + '</span>', iconSize: [34, 34], iconAnchor: anchor }), keyboard: false })
+        .bindTooltip(label, { permanent: true, direction: 'top', offset: [0, -26] }).addTo(markers);
+    }
+    if (R.o) icon(R.o, '🚗', 'Salida', [17, 17]);
+    if (R.dst) icon(R.dst, '🏁', 'Meta', [9, 30]);
     if (R.info && R.info.geom) {
       routeLayer = L.geoJSON({ type: 'LineString', coordinates: R.info.geom }, { style: { color: '#0A6C98', weight: 6, opacity: 0.85 } }).addTo(map);
     }
@@ -1162,7 +1170,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     });
     var r = NAV.routes[NAV.cur];
     if (r) L.polyline(r.geom.map(function (p) { return [p[1], p[0]]; }), { color: '#1F8FD0', weight: 7, opacity: 0.95 }).addTo(NAV.layer);
-    if (NAV.pos) L.circleMarker(NAV.pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#1F6FEB', fillOpacity: 1 }).bindTooltip('Ustedes', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(NAV.layer);
+    if (NAV.pos && NAV.on) L.circleMarker(NAV.pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#1F6FEB', fillOpacity: 1 }).bindTooltip('Ustedes', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(NAV.layer);
   }
   function navCheck(reason, prev0) {
     if (NAV.busy || !NAV.pos || !R.dst) return;
@@ -1264,6 +1272,17 @@ details ul{margin:8px 0 0;padding-left:20px}
       try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { NAV.lock = l; }, function () {}); } catch (e) {}
     }
   }
+  $('nav-new').addEventListener('click', function () {
+    if (NAV.on) navStop();
+    R.o = null; R.dst = null; R.info = null; R.osm = undefined; segManual = false;
+    NAV.routes = []; NAV.cur = 0; NAV.pos = null; NAV.busy = false;
+    $('q').value = ''; $('sugg').hidden = true; $('sugg').innerHTML = ''; $('nav-st').hidden = true; $('nav-alts').innerHTML = '';
+    if (NAV.layer && map) { map.removeLayer(NAV.layer); NAV.layer = null; }
+    $('nav-new').hidden = true; $('nav-go').disabled = false;
+    populateRoads(); setLanes(false); $('m-len').value = 1; fillAuto(); $('par-src').textContent = '';
+    drawMap(); renderRoute(); stateHint(); persist(); updatePill();
+    hint('Ruta eliminada. Busquen un nuevo destino o tóquenlo en el mapa.');
+  });
   $('nav-go').addEventListener('click', function () { navBegin(false); });
   $('nav-sim').addEventListener('click', function () { navBegin(true); });
   $('nav-stop').addEventListener('click', function () { navStop('Navegación detenida.'); });
