@@ -260,6 +260,7 @@ details ul{margin:8px 0 0;padding-left:20px}
           <div class="fld"><label for="ref-lanes">Carriles (todos los sentidos, estimado)</label><input id="ref-lanes" type="number" inputmode="numeric" min="1" max="16" step="1" value="6"></div>
           <button class="btn" id="b-ref" type="button">Autollenar</button>
         </div>
+        <p class="note" id="roads-note" style="margin-top:8px"></p>
         <p class="note" style="margin-top:8px">Los carriles se llenan solos con un valor estimado por vía (no verificado). Cámbienlo si la vía tiene otra cantidad.</p>
         <p class="msg" id="ref-msg" role="status"></p>
         <p class="note" style="margin-top:8px"><strong>Importante:</strong> los conteos de referencia por vía (por cada 30 min, en horario normal y en hora pico) fueron proporcionados por el equipo y no tienen una fuente verificada. Se reparten entre los carriles que escriban, y el valor por carril se limita al máximo del modelo. La velocidad no es una medición: la calcula el modelo a partir del flujo. Por eso estas filas se marcan «referencia», no entran al ajuste y no sustituyen una medición en campo. Declárenlo así en el informe (sección 9).</p>
@@ -701,8 +702,9 @@ details ul{margin:8px 0 0;padding-left:20px}
     return { q: q, v: v, k: k };
   }
   function parseHour(s) { var a = /^(\d{1,2}):(\d{2})$/.exec(s || ''); return a ? (+a[1]) + (+a[2]) / 60 : NaN; }
+  function roadMatch(m) { var n = $('ref-road') ? $('ref-road').value : ''; return !m.road || !n || m.road === n; }
   function computeFit() {
-    var rows = R.meas.filter(function (m) { return !m.ref; }).map(function (m) { return { h: m.h, d: derived(m) }; }).filter(function (r) { return isFinite(r.d.k) && isFinite(r.d.v); });
+    var rows = R.meas.filter(function (m) { return !m.ref && roadMatch(m); }).map(function (m) { return { h: m.h, d: derived(m) }; }).filter(function (r) { return isFinite(r.d.k) && isFinite(r.d.v); });
     var lin = window.RVfit.linfit(rows.map(function (r) { return r.d.k; }), rows.map(function (r) { return r.d.v; }));
     var CUT = 13, am = rows.filter(function (r) { return r.h >= 4 && r.h < CUT; }), pm = rows.filter(function (r) { return r.h >= CUT && r.h < 22; });
     var qf = function (a) { return window.RVfit.quadfit(a.map(function (r) { return r.h; }), a.map(function (r) { return r.d.k; })); };
@@ -714,14 +716,15 @@ details ul{margin:8px 0 0;padding-left:20px}
   function renderMeas() {
     if ($('tab-meds').hidden) return;
     var i, html = '<thead><tr><th>Hora</th><th>Conteo</th><th>Tramo (km)</th><th>Tiempo (min)</th><th>q (veh/h)</th><th>v (km/h)</th><th>k (veh/km)</th><th></th></tr></thead><tbody>';
-    var sorted = R.meas.map(function (m, idx) { return { m: m, idx: idx }; }).sort(function (a, b) { return a.m.h - b.m.h; });
+    var sorted = R.meas.map(function (m, idx) { return { m: m, idx: idx }; }).filter(function (e) { return roadMatch(e.m); }).sort(function (a, b) { return a.m.h - b.m.h; });
     sorted.forEach(function (e) {
       var m = e.m, d = derived(m);
       html += '<tr><td>' + fh(m.h) + (m.ex ? '<span class="ex">ejemplo</span>' : '') + (m.ref ? '<span class="ex">referencia' + (m.cap ? ' · tope' : '') + '</span>' : '') + '</td><td>' + f0(m.count) + ' <span class="ex">' + (m.win || 5) + ' min</span></td><td>' + f2(m.len) + '</td><td>' + f2(m.sec / 60) + '</td><td>' + f0(d.q) + '</td><td>' + f1(d.v) + '</td><td>' + f0(d.k) +
         '</td><td><button type="button" data-del="' + e.idx + '" aria-label="Quitar medición de las ' + fh(m.h) + '">×</button></td></tr>';
     });
-    $('mt').innerHTML = R.meas.length ? html + '</tbody>' : '';
-    $('mt-empty').textContent = R.meas.length ? '' : 'Aún no hay mediciones en esta vía. Agreguen la primera arriba o carguen un ejemplo para ver cómo funciona el ajuste.';
+    var nShown = sorted.length;
+    $('mt').innerHTML = nShown ? html + '</tbody>' : '';
+    $('mt-empty').textContent = nShown ? (R.meas.length > nShown ? 'Se muestran las mediciones de esta vía (' + nShown + ' de ' + R.meas.length + ' en la ruta).' : '') : (R.meas.length ? 'Aún no hay mediciones de esta vía. Elijan otra vía de la lista para ver las suyas, o agreguen la primera arriba.' : 'Aún no hay mediciones en esta vía. Agreguen la primera arriba o carguen un ejemplo para ver cómo funciona el ajuste.');
     $('b-ex').hidden = R.meas.length > 0;
     $('b-clrm').hidden = R.meas.length === 0;
 
@@ -781,7 +784,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     if (msg) return;
     var isAuto = auto && count === auto.count && len === auto.len && secMin === auto.min;
     segManual = false;
-    R.meas.push({ h: h, count: count, win: 30, len: len, sec: sec, ex: false, ref: !!isAuto, cap: !!(isAuto && auto.cap), road: isAuto ? auto.road : undefined });
+    R.meas.push({ h: h, count: count, win: 30, len: len, sec: sec, ex: false, ref: !!isAuto, cap: !!(isAuto && auto.cap), road: curRoad().name });
     R.fitted = false; persist();
     $('m-count').value = ''; $('m-sec').value = ''; $('m-prev').textContent = ''; $('m-auto').textContent = ''; auto = null;
     renderMeas(); $('m-count').focus();
@@ -802,78 +805,133 @@ details ul{margin:8px 0 0;padding-left:20px}
   var REFROADS = {
     'Calzada Roosevelt': [4500, 12500], 'Calzada Aguilar Batres': [4200, 10000], 'Calzada San Juan': [3800, 8500],
     'Carretera a El Salvador': [3500, 8000], 'Bulevar Liberación': [5000, 11000], 'Avenida Petapa': [3000, 7000],
-    'Calzada Atanasio Tzul': [2500, 5500], 'Bulevar Los Próceres': [3000, 6500], 'Avenida Las Américas': [2000, 4500]
+    'Calzada Atanasio Tzul': [2500, 5500], 'Bulevar Los Próceres': [3000, 6500], 'Avenida Las Américas': [2000, 4500],
+    'Anillo Periférico': [1500, 3500]
   };
   var LANES = { 'Calzada Roosevelt': 6, 'Calzada Aguilar Batres': 6, 'Calzada San Juan': 4, 'Carretera a El Salvador': 6, 'Bulevar Liberación': 6,
-    'Avenida Petapa': 4, 'Calzada Atanasio Tzul': 4, 'Bulevar Los Próceres': 6, 'Avenida Las Américas': 4 };
+    'Avenida Petapa': 4, 'Calzada Atanasio Tzul': 4, 'Bulevar Los Próceres': 6, 'Avenida Las Américas': 4, 'Anillo Periférico': 6 };
   /* Supuesto del equipo de trabajo: de noche circula un 30 % del flujo de horario normal. */
   function dayF(h) { if (h < 4.5 || h >= 22) return 0.3; if (h < 6) return 0.3 + 0.7 * (h - 4.5) / 1.5; if (h > 20) return 1 - 0.7 * (h - 20) / 2; return 1; }
-  function segKm() { return (!segManual && R && R.info && R.info.km >= 0.05) ? Math.round(R.info.km * 100) / 100 : (isFinite(parseFloat($('m-len').value)) && parseFloat($('m-len').value) > 0 ? parseFloat($('m-len').value) : 1); }
   var segManual = false;
-  function refRow(h, road, lanes, len) {
+  var ROADKEYS = { 'Calzada Roosevelt': ['roosevelt'], 'Calzada Aguilar Batres': ['aguilar batres'], 'Calzada San Juan': ['san juan'],
+    'Carretera a El Salvador': ['el salvador'], 'Bulevar Liberación': ['liberacion'], 'Avenida Petapa': ['petapa'],
+    'Calzada Atanasio Tzul': ['atanasio'], 'Bulevar Los Próceres': ['proceres'], 'Avenida Las Américas': ['americas'], 'Anillo Periférico': ['periferico'] };
+  function norm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function roadKey(name) {
+    var nm = norm(name), best = null;
+    Object.keys(ROADKEYS).forEach(function (k) { if (ROADKEYS[k].some(function (w) { return nm.indexOf(w) >= 0; })) best = k; });
+    return best;
+  }
+  /* La vía elegida en la lista: su nombre, si tenemos cifras de referencia (key) y cuántos km recorre la ruta por ella. */
+  function curRoad() {
+    var name = $('ref-road').value, km = null;
+    if (R && R.info && R.info.roads) R.info.roads.forEach(function (r) { if (r.name === name) km = r.km; });
+    return { name: name, key: roadKey(name), km: km };
+  }
+  function roadOsm(name) { return (R && R.osm && R.osm.roads && R.osm.roads[name]) || null; }
+  function segKm() {
+    var typed = parseFloat($('m-len').value), c = curRoad();
+    if (segManual && typed > 0) return typed;
+    if (c.km >= 0.05) return Math.round(c.km * 100) / 100;
+    if (R && R.info && R.info.km >= 0.05) return Math.round(R.info.km * 100) / 100;
+    return typed > 0 ? typed : 1;
+  }
+  /* La lista de vías muestra solo las vías por las que pasa la ruta marcada en el mapa. */
+  function populateRoads() {
+    var sel = $('ref-road'), prev = sel.value, list;
+    if (R && R.info && R.info.roads && R.info.roads.length) {
+      list = R.info.roads.map(function (r) { return { v: r.name, t: r.name + ' · ' + f1(r.km) + ' km' }; });
+      $('roads-note').textContent = 'Estas son las vías por las que pasa su ruta, en orden. Elijan una para medirla; cada vía guarda sus propias mediciones.';
+    } else {
+      list = Object.keys(REFROADS).map(function (n) { return { v: n, t: n }; });
+      $('roads-note').textContent = 'Marquen el origen y el destino en el mapa y aquí aparecerán solo las vías de su ruta.';
+    }
+    sel.innerHTML = '';
+    list.forEach(function (x) { var o = document.createElement('option'); o.value = x.v; o.textContent = x.t; sel.appendChild(o); });
+    var has = list.some(function (x) { return x.v === prev; });
+    if (has) sel.value = prev;
+    else {
+      var withData = list.filter(function (x) { return roadKey(x.v); })[0];
+      sel.value = (withData || list[0]).v;
+    }
+  }
+  function refRow(h, key, lanes, len, name) {
     len = len || segKm();
-    var ref = REFROADS[road], qmax = P.vf * P.kj / 4, top = 0.98 * qmax, kTop = Math.max(P.kmax, P.kmax2, 1);
+    var ref = REFROADS[key], qmax = P.vf * P.kj / 4, top = 0.98 * qmax, kTop = Math.max(P.kmax, P.kmax2, 1);
     var sh = Math.min(1, Math.max(0, kOf(h) / kTop));
     var q = (ref[0] + (ref[1] - ref[0]) * sh) * dayF(h) * 2 / lanes, cap = false, need = q / top;
     if (q > top) { q = top; cap = true; }
     var disc = Math.sqrt(Math.max(0, 1 - q / qmax)), k = (P.kj / 2) * (1 + (sh > 0.5 ? 1 : -1) * disc), v = q / k;
-    return { h: h, count: Math.max(1, Math.round(q / 2)), win: 30, len: len, sec: Math.max(1, Math.round(len * 3600 / v)), ref: true, cap: cap, road: road, need: need };
+    return { h: h, count: Math.max(1, Math.round(q / 2)), win: 30, len: len, sec: Math.max(1, Math.round(len * 3600 / v)), ref: true, cap: cap, road: name || key, need: need };
   }
   var auto = null;
   function fillAuto() {
-    var h = parseHour($('m-time').value), road = $('ref-road').value, lanes = Math.round(parseFloat($('ref-lanes').value));
-    if (!isFinite(h) || h < 0 || h >= 24 || !REFROADS[road] || !(lanes >= 1)) { auto = null; $('m-auto').textContent = ''; return; }
-    var r = refRow(h, road, lanes);
-    $('m-count').value = r.count; if (!segManual) $('m-len').value = r.len; auto = { count: r.count, len: r.len, min: Math.round(r.sec / 60 * 100) / 100, cap: r.cap, road: road };
+    var h = parseHour($('m-time').value), c = curRoad(), lanes = Math.round(parseFloat($('ref-lanes').value));
+    if (!isFinite(h) || h < 0 || h >= 24) { auto = null; $('m-auto').textContent = ''; return; }
+    if (!c.key) {
+      if (auto) { $('m-count').value = ''; $('m-sec').value = ''; }
+      auto = null; if (!segManual && c.km >= 0.05) $('m-len').value = segKm();
+      $('m-auto').textContent = 'Para ' + c.name + ' no hay cifras de referencia. Midan en campo: cuenten los vehículos de un carril durante 30 minutos y cronometren el tramo.';
+      return;
+    }
+    if (!(lanes >= 1)) { auto = null; return; }
+    var r = refRow(h, c.key, lanes, segKm(), c.name);
+    $('m-count').value = r.count; if (!segManual) $('m-len').value = r.len; auto = { count: r.count, len: r.len, min: Math.round(r.sec / 60 * 100) / 100, cap: r.cap, road: c.name };
     $('m-sec').value = auto.min;
-    $('m-auto').textContent = 'Valores de referencia para ' + road + ' (' + lanes + ' carriles) a las ' + fh(h) + (R && R.info && R.info.km && !segManual ? '; el tramo es la ruta marcada en el mapa (' + f1(R.info.km) + ' km)' : '') + '. Si miden en campo, escriban sus propios valores y la medición contará como real.';
+    $('m-auto').textContent = 'Valores de referencia para ' + c.name + ' (' + lanes + ' carriles) a las ' + fh(h) + (c.km >= 0.05 && !segManual ? '; el tramo es lo que recorre su ruta por esta vía (' + f1(c.km) + ' km)' : '') + '. Si miden en campo, escriban sus propios valores y la medición contará como real.';
     previewMeas();
   }
-  function setLanes(user) { $('ref-lanes').value = LANES[$('ref-road').value] || 6; lanesSrc = 'estimado'; showLanesSrc(); fillAuto(); if (user === true) applyRefParams(); }
   var lanesSrc = 'estimado';
-  function showLanesSrc() { var l = document.querySelector('label[for="ref-lanes"]'); if (l) l.textContent = 'Carriles (todos los sentidos, ' + (lanesSrc === 'OpenStreetMap' ? 'de OpenStreetMap' : 'estimado') + ')'; }
+  function setLanes(user) {
+    var c = curRoad(), o = roadOsm(c.name);
+    if (o && o.lanes) { $('ref-lanes').value = o.lanes; lanesSrc = 'OpenStreetMap'; }
+    else { $('ref-lanes').value = LANES[c.key] || 4; lanesSrc = 'estimado'; }
+    showLanesSrc(); fillAuto(); if (user === true) applyRefParams();
+  }
+  function showLanesSrc() { var l = document.querySelector('label[for="ref-lanes"]'); if (l) l.textContent = 'Carriles (todos los sentidos, ' + (lanesSrc === 'OpenStreetMap' ? 'de OpenStreetMap' : (lanesSrc === 'manual' ? 'escritos por ustedes' : 'estimado')) + ')'; }
   /* Parámetros de la vía que se llenan solos a partir de la vía elegida y de la ruta del mapa. */
   function applyRefParams(force) {
     if (!R) return;
-    var road = $('ref-road').value, lanes = Math.round(parseFloat($('ref-lanes').value)), ref = REFROADS[road];
-    if (!ref || !(lanes >= 1)) return;
-    var qmax = P.vf * P.kj / 4, top = 0.98 * qmax, said = [];
-    var qpk = Math.min(top, ref[1] * 2 / lanes);
-    var kpk = Math.round((P.kj / 2) * (1 + Math.sqrt(Math.max(0, 1 - qpk / qmax))));
-    var d0 = Math.max(50, Math.min(Math.round(ref[0] * 2 / lanes / 50) * 50, Math.floor(0.9 * qmax / 50) * 50));
-    if (!R.fitted || force) { setVal('kmax', kpk); setVal('kmax2', kpk); said.push('densidad en hora pico = ' + kpk + ' veh/km'); }
+    var c = curRoad(), lanes = Math.round(parseFloat($('ref-lanes').value)), ref = c.key ? REFROADS[c.key] : null, said = [], o = R.osm, oo = roadOsm(c.name);
+    var qmax = P.vf * P.kj / 4, top = 0.98 * qmax;
     setVal('kj', Math.round(P.kj));
+    if (ref && lanes >= 1) {
+      var qpk = Math.min(top, ref[1] * 2 / lanes);
+      var kpk = Math.round((P.kj / 2) * (1 + Math.sqrt(Math.max(0, 1 - qpk / qmax))));
+      var d0 = Math.max(50, Math.min(Math.round(ref[0] * 2 / lanes / 50) * 50, Math.floor(0.9 * qmax / 50) * 50));
+      if (!R.fitted || force) { setVal('kmax', kpk); setVal('kmax2', kpk); said.push('densidad en hora pico = ' + kpk + ' veh/km'); }
+      setVal('D0', d0); said.push('demanda D0 = ' + f0(d0) + ' veh/h por carril');
+    } else if (c.name) said.push('para ' + c.name + ' no hay cifras de referencia, así que la densidad en hora pico y la demanda quedaron como estaban');
     if (!R.fitted || force) { setVal('hp', 7.5); setVal('al', 30); setVal('hp2', 17.5); setVal('al2', 20); }
-    setVal('D0', d0); said.push('demanda D0 = ' + f0(d0) + ' veh/h por carril');
     R.autoApplied = true;
-    var o = R.osm;
     if (R.info && R.info.km >= 0.1) said.unshift('distancia = ' + f1(R.info.km) + ' km (ruta del mapa)');
     if (o && isFinite(o.signals)) { setVal('n', o.signals); said.push('semáforos = ' + o.signals + ' (OpenStreetMap)'); }
-    if (o && o.vmax >= 20 && o.vmax <= 120) { setVal('vf', o.vmax); said.push('velocidad libre = ' + o.vmax + ' km/h (límite en OpenStreetMap)'); }
+    if (oo && oo.vmax >= 20 && oo.vmax <= 120) { setVal('vf', oo.vmax); said.push('velocidad libre = ' + oo.vmax + ' km/h (límite en OpenStreetMap)'); }
     $('par-src').textContent = 'Llenados automáticamente: ' + said.join('; ') + '. Valores de ejemplo (supuestos): horas pico 7:30 y 17:30, apertura α, espera de 1 min por semáforo y crecimiento de 4 % al año. La lluvia viene del clima y la hora de salida es la de ahora. Todo se puede cambiar a mano.' + (o ? '' : (R.info && R.info.km ? (R.osm === null ? ' No se pudo consultar OpenStreetMap: los carriles son un estimado y los semáforos y la velocidad quedaron como estaban.' : ' Consultando OpenStreetMap para carriles, semáforos y velocidad…') : ''));
     renderSim();
   }
-  $('ref-road').addEventListener('change', function () { setLanes(true); });
+  $('ref-road').addEventListener('change', function () { segManual = false; setLanes(true); renderMeas(); });
   $('ref-lanes').addEventListener('input', function () { lanesSrc = 'manual'; showLanesSrc(); fillAuto(); applyRefParams(); });
   $('m-time').addEventListener('input', fillAuto);
   $('m-time').addEventListener('change', fillAuto);
   $('m-time').addEventListener('blur', function () { if (!$('m-count').value && !$('m-sec').value) fillAuto(); });
   $('m-count').addEventListener('focus', function () { if (!$('m-count').value && !$('m-sec').value) fillAuto(); });
-  Object.keys(REFROADS).forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n; $('ref-road').appendChild(o); });
-  $('ref-road').value = 'Calzada Roosevelt'; setLanes();
+  populateRoads(); setLanes();
   $('b-ref').addEventListener('click', function () {
-    var road = $('ref-road').value, lanes = Math.round(parseFloat($('ref-lanes').value)), ref = REFROADS[road];
-    if (!ref || !(lanes >= 1)) { $('ref-msg').textContent = 'Elijan una vía y escriban cuántos carriles tiene.'; return; }
-    var qmax = P.vf * P.kj / 4, top = 0.98 * qmax, capped = 0, need = 0;
+    var c = curRoad(), lanes = Math.round(parseFloat($('ref-lanes').value)), ref = c.key ? REFROADS[c.key] : null;
+    if (!c.name) { $('ref-msg').textContent = 'Elijan una vía.'; return; }
+    if (!ref) { $('ref-msg').textContent = 'Para ' + c.name + ' no hay cifras de referencia. Midan esa vía en campo, o elijan otra vía de la lista.'; return; }
+    if (!(lanes >= 1)) { $('ref-msg').textContent = 'Escriban cuántos carriles tiene la vía.'; return; }
+    var qmax = P.vf * P.kj / 4, capped = 0, need = 0;
     var hs = [0, 2, 4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10, 12, 14, 16, 16.5, 17, 17.5, 18, 18.5, 19, 20, 22];
     var rows = hs.map(function (h) {
-      var r = refRow(h, road, lanes, segKm()); need = Math.max(need, r.need); if (r.cap) capped++; return r;
+      var r = refRow(h, c.key, lanes, segKm(), c.name); need = Math.max(need, r.need); if (r.cap) capped++; return r;
     });
-    R.meas = R.meas.filter(function (m) { return !m.ref && !m.ex; }).concat(rows);
+    R.meas = R.meas.filter(function (m) { return !(m.ref && m.road === c.name) && !m.ex; }).concat(rows);
     var d0 = Math.max(50, Math.min(Math.round(ref[0] * 2 / lanes / 50) * 50, Math.floor(0.9 * qmax / 50) * 50));
     applyRefParams(true);
     R.fitted = false; persist(); renderMeas();
-    $('ref-msg').textContent = 'Listo: ' + rows.length + ' filas de referencia para ' + road + ' con ' + lanes + ' carriles, y los parámetros del simulador ya están llenos (D0 = ' + f0(d0) + ' veh/h por carril). ' +
+    $('ref-msg').textContent = 'Listo: ' + rows.length + ' filas de referencia para ' + c.name + ' con ' + lanes + ' carriles, y los parámetros del simulador ya están llenos (D0 = ' + f0(d0) + ' veh/h por carril). ' +
       (capped ? 'En ' + capped + (capped === 1 ? ' fila' : ' filas') + ' el flujo por carril superaba el máximo del modelo (' + f0(qmax) + ' veh/h) y se limitó. Para que esas cifras cupieran sin limitarse harían falta unos ' + Math.ceil(need * lanes) + ' carriles; si la vía tiene menos, las cifras de referencia son demasiado altas.' : 'Ninguna fila superó el máximo del modelo.');
   });
   var clrT = null;
@@ -923,6 +981,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     var i = R.info;
     if (i && i.km) {
       h += '<dt>Distancia por carretera</dt><dd>' + f1(i.km) + ' km</dd>';
+      if (i.roads && i.roads.length) h += '<dt>Vías de la ruta</dt><dd>' + i.roads.map(function (r) { return r.name.replace(/[<>&]/g, ''); }).join(' → ') + '</dd>';
       h += '<dt>Sin tráfico, según el mapa</dt><dd>' + f0(i.min) + ' min</dd>';
       h += '<dt>Velocidad de referencia</dt><dd>' + f0(i.km / (i.min / 60)) + ' km/h</dd>';
     } else if (i && i.straight) {
@@ -933,7 +992,7 @@ details ul{margin:8px 0 0;padding-left:20px}
   function fitRoute() { if (routeLayer) map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] }); }
   function route() {
     routing = true; hint('Trazando la ruta…');
-    var url = 'https://router.project-osrm.org/route/v1/driving/' + R.o[1] + ',' + R.o[0] + ';' + R.dst[1] + ',' + R.dst[0] + '?overview=full&geometries=geojson';
+    var url = 'https://router.project-osrm.org/route/v1/driving/' + R.o[1] + ',' + R.o[0] + ';' + R.dst[1] + ',' + R.dst[0] + '?overview=full&geometries=geojson&steps=true';
     var ctl = new AbortController(), to = setTimeout(function () { ctl.abort(); }, 12000);
     var o0 = R.o, d0 = R.dst;
     fetch(url, { signal: ctl.signal }).then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); }).then(function (j) {
@@ -941,10 +1000,19 @@ details ul{margin:8px 0 0;padding-left:20px}
       if (j.code !== 'Ok' || !j.routes || !j.routes[0]) throw new Error('sin ruta');
       var rt = j.routes[0], c = rt.geometry.coordinates, step = Math.max(1, Math.ceil(c.length / 800));
       var g = c.filter(function (_, n) { return n % step === 0 || n === c.length - 1; }).map(function (p) { return [Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5]; });
-      R.info = { km: rt.distance / 1000, min: rt.duration / 60, geom: g };
+      var acc = {}, order = [];
+      (rt.legs || []).forEach(function (lg) { (lg.steps || []).forEach(function (st) {
+        var nm = (st.name || '').trim(); if (!nm) return;
+        if (acc[nm] === undefined) { acc[nm] = 0; order.push(nm); }
+        acc[nm] += st.distance || 0;
+      }); });
+      var roads = order.map(function (n) { return { name: n, km: acc[n] / 1000 }; });
+      var big = roads.filter(function (r) { return r.km >= 0.3; });
+      if (!big.length) big = roads.slice().sort(function (a, b) { return b.km - a.km; }).slice(0, 3);
+      R.info = { km: rt.distance / 1000, min: rt.duration / 60, geom: g, roads: big };
       var km = Math.round(R.info.km * 10) / 10; if (km >= 0.1) setVal('d', km);
       drawMap(); fitRoute(); renderRoute(); updatePill(); stateHint(); persist();
-      R.osm = undefined; segManual = false; $('m-len').value = Math.round(R.info.km * 100) / 100; fillAuto(); applyRefParams(); roadInfo(R);
+      R.osm = undefined; segManual = false; populateRoads(); setLanes(false); $('m-len').value = segKm(); fillAuto(); applyRefParams(); roadInfo(R);
     }).catch(function () {
       if (R.o !== o0 || R.dst !== d0) return;
       R.info = { km: null, straight: haversine(R.o, R.dst) };
@@ -954,31 +1022,26 @@ details ul{margin:8px 0 0;padding-left:20px}
     }).then(function () { clearTimeout(to); routing = false; });
   }
   /* Carriles, semáforos y límite de velocidad desde OpenStreetMap (Overpass), a lo largo de la ruta marcada. */
-  var ROADKEYS = { 'Calzada Roosevelt': ['roosevelt'], 'Calzada Aguilar Batres': ['aguilar batres'], 'Calzada San Juan': ['san juan'],
-    'Carretera a El Salvador': ['el salvador'], 'Bulevar Liberación': ['liberacion'], 'Avenida Petapa': ['petapa'],
-    'Calzada Atanasio Tzul': ['atanasio'], 'Bulevar Los Próceres': ['proceres'], 'Avenida Las Américas': ['americas'] };
-  function norm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
   function median(a) { a = a.slice().sort(function (x, y) { return x - y; }); var n = a.length; return n ? (n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2) : NaN; }
-  function parseOsm(els) {
+  function parseOsm(els, names) {
     var ways = els.filter(function (e) { return e.type === 'way' && e.tags; }), nodes = els.filter(function (e) { return e.type === 'node' && isFinite(e.lat); });
-    var best = null, bestN = 0;
-    Object.keys(ROADKEYS).forEach(function (road) {
-      var n = ways.filter(function (w) { var nm = norm(w.tags.name); return ROADKEYS[road].some(function (k) { return nm.indexOf(k) >= 0; }); }).length;
-      if (n > bestN) { bestN = n; best = road; }
+    var roads = {};
+    names.forEach(function (rn) {
+      var n0 = norm(rn);
+      var mw = ways.filter(function (w) { var nm = norm(w.tags.name); return nm && (nm === n0 || nm.indexOf(n0) >= 0 || n0.indexOf(nm) >= 0); });
+      var one = [], two = [], sp = [];
+      mw.forEach(function (w) {
+        var l = parseInt(w.tags.lanes, 10), ow = w.tags.oneway === 'yes' || w.tags.oneway === '-1', ms = parseInt(w.tags.maxspeed, 10);
+        if (l >= 1) (ow ? one : two).push(l);
+        if (ms >= 10) sp.push(ms);
+      });
+      roads[rn] = { lanes: one.length ? 2 * Math.round(median(one)) : (two.length ? Math.round(median(two)) : null), vmax: sp.length ? Math.round(median(sp)) : null };
     });
-    var mw = best ? ways.filter(function (w) { var nm = norm(w.tags.name); return ROADKEYS[best].some(function (k) { return nm.indexOf(k) >= 0; }); }) : [];
-    var one = [], two = [], sp = [];
-    mw.forEach(function (w) {
-      var l = parseInt(w.tags.lanes, 10), ow = w.tags.oneway === 'yes' || w.tags.oneway === '-1', ms = parseInt(w.tags.maxspeed, 10);
-      if (l >= 1) (ow ? one : two).push(l);
-      if (ms >= 10) sp.push(ms);
-    });
-    var lanes = one.length ? 2 * Math.round(median(one)) : (two.length ? Math.round(median(two)) : null);
     var cl = [];
     nodes.forEach(function (nd) {
       if (!cl.some(function (c) { return haversine([c.lat, c.lon], [nd.lat, nd.lon]) < 0.04; })) cl.push(nd);
     });
-    return { road: best, lanes: lanes, signals: cl.length, vmax: sp.length ? Math.round(median(sp)) : null };
+    return { roads: roads, signals: cl.length };
   }
   function roadInfo(rt) {
     var g = rt.info.geom, step = Math.max(1, Math.ceil(g.length / 60)), pts = [];
@@ -986,17 +1049,13 @@ details ul{margin:8px 0 0;padding-left:20px}
     var P2 = pts.join(',');
     var q = '[out:json][timeout:25];way(around:15,' + P2 + ')[highway~"^(motorway|trunk|primary|secondary|tertiary)$"]->.w;node(around:12,' + P2 + ')[highway=traffic_signals]->.s;.w out tags;.s out;';
     var ctl = new AbortController(), to = setTimeout(function () { ctl.abort(); }, 25000), info0 = rt.info;
+    var names = (rt.info.roads || []).map(function (r) { return r.name; });
     return fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q), signal: ctl.signal })
       .then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); })
       .then(function (j) {
         if (rt.info !== info0) return;
-        var o = parseOsm(j.elements || []);
-        rt.osm = o;
-        if (R === rt) {
-          if (o.road) $('ref-road').value = o.road;
-          if (o.lanes) { $('ref-lanes').value = o.lanes; lanesSrc = 'OpenStreetMap'; } else { $('ref-lanes').value = LANES[$('ref-road').value] || 6; lanesSrc = 'estimado'; }
-          showLanesSrc(); segManual = false; fillAuto(); applyRefParams(); persist();
-        }
+        rt.osm = parseOsm(j.elements || [], names);
+        if (R === rt) { segManual = false; setLanes(false); applyRefParams(); persist(); }
       }).catch(function () { rt.osm = null; if (R === rt) { applyRefParams(); } }).then(function () { clearTimeout(to); });
   }
   function search(q) {
@@ -1031,7 +1090,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     $('ave').appendChild(b);
   });
   $('f-search').addEventListener('submit', function (e) { e.preventDefault(); search($('q').value); });
-  $('b-clear').addEventListener('click', function () { R.o = null; R.dst = null; R.info = null; R.osm = undefined; segManual = false; $('m-len').value = 1; fillAuto(); $('par-src').textContent = ''; drawMap(); renderRoute(); stateHint(); persist(); });
+  $('b-clear').addEventListener('click', function () { R.o = null; R.dst = null; R.info = null; R.osm = undefined; segManual = false; populateRoads(); setLanes(false); $('m-len').value = 1; fillAuto(); $('par-src').textContent = ''; drawMap(); renderRoute(); stateHint(); persist(); });
 
   /* ---------------- Vías guardadas ---------------- */
   function updatePill() { $('pill').textContent = db.active + ' · ' + f1(P.d) + ' km'; renderRoute(); }
@@ -1174,6 +1233,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     });
     try { history.replaceState(null, '', '#' + id); } catch (e) {}
     if (id === 'mapa' && map) setTimeout(function () { map.invalidateSize(); }, 30);
+    if (id === 'meds' || id === 'sim') { var pv = $('ref-road').value; populateRoads(); if ($('ref-road').value !== pv) setLanes(false); }
     if (id === 'meds') { renderMeas(); if (!$('m-count').value && !$('m-sec').value) fillAuto(); }
     if (id === 'sim') {
       if (R && !R.autoApplied) {
