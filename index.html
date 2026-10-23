@@ -75,6 +75,15 @@ input[type=text],input[type=search],input[type=number],input[type=time],select{f
 .msg{font-size:13.5px;color:var(--crit);min-height:1.2em;margin-top:6px}
 
 /* Mapa */
+.roadsbox{margin-top:12px;border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--bg)}
+.roadsbox h3{font-size:13px;color:var(--muted);font-weight:600;margin:0 0 6px}
+.roadsbox ol{margin:0;padding-left:20px;font-size:14px}
+.roadsbox li span{color:var(--muted);font-size:12.5px}
+.navst{margin-top:12px;border:1px solid var(--line);border-left-width:5px;border-radius:6px;padding:10px 12px;font-size:14px}
+.navst b{display:block;font-size:16px;margin-bottom:2px}
+.navst.ok{border-left-color:#1B7A4B}.navst.mid{border-left-color:#C77700}.navst.bad{border-left-color:var(--crit)}
+.navalt{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:13.5px;border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+
 .mapgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:16px;align-items:start}
 @media (max-width:880px){.mapgrid{grid-template-columns:minmax(0,1fr)}}
 .search{display:flex;gap:8px}
@@ -238,7 +247,20 @@ details ul{margin:8px 0 0;padding-left:20px}
             <button class="btn sec" id="b-new" type="button">Nueva vía</button>
             <button class="btn sec bad" id="b-del" type="button">Eliminar</button>
           </div>
+          <div class="roadsbox" id="roadsbox" hidden></div>
           <p class="note" style="margin-top:12px">Marca el origen y el destino sobre la vía que van a estudiar. La distancia se calcula por carretera y pasa sola al simulador. Cada vía guarda sus propios parámetros y mediciones en este dispositivo.</p>
+        </div>
+        <div class="panel" id="navpanel">
+          <h2>Navegación</h2>
+          <p class="note" style="margin-bottom:10px">Marquen el destino. Al iniciar, la app sigue su posición, calcula si la ruta es viable a esa hora y recalcula si conviene otra.</p>
+          <div class="fld"><label for="nav-hour">Hora para el cálculo (vacío = ahora)</label><input id="nav-hour" type="time"></div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="nav-go" type="button">Iniciar con GPS</button>
+            <button class="btn sec" id="nav-sim" type="button">Simular recorrido</button>
+            <button class="btn sec bad" id="nav-stop" type="button" hidden>Detener</button>
+          </div>
+          <div class="navst" id="nav-st" aria-live="polite" hidden></div>
+          <div id="nav-alts"></div>
         </div>
         <div class="panel">
           <h2>Siguiente paso</h2>
@@ -838,22 +860,11 @@ details ul{margin:8px 0 0;padding-left:20px}
   }
   /* La lista de vías muestra solo las vías por las que pasa la ruta marcada en el mapa. */
   function populateRoads() {
-    var sel = $('ref-road'), prev = sel.value, list;
-    if (R && R.info && R.info.roads && R.info.roads.length) {
-      list = R.info.roads.map(function (r) { return { v: r.name, t: r.name + ' · ' + f1(r.km) + ' km' }; });
-      $('roads-note').textContent = 'Estas son las vías por las que pasa su ruta, en orden. Elijan una para medirla; cada vía guarda sus propias mediciones.';
-    } else {
-      list = Object.keys(REFROADS).map(function (n) { return { v: n, t: n }; });
-      $('roads-note').textContent = 'Marquen el origen y el destino en el mapa y aquí aparecerán solo las vías de su ruta.';
-    }
+    var sel = $('ref-road'), prev = sel.value;
     sel.innerHTML = '';
-    list.forEach(function (x) { var o = document.createElement('option'); o.value = x.v; o.textContent = x.t; sel.appendChild(o); });
-    var has = list.some(function (x) { return x.v === prev; });
-    if (has) sel.value = prev;
-    else {
-      var withData = list.filter(function (x) { return roadKey(x.v); })[0];
-      sel.value = (withData || list[0]).v;
-    }
+    Object.keys(REFROADS).forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+    sel.value = REFROADS[prev] ? prev : 'Calzada Roosevelt';
+    $('roads-note').textContent = '';
   }
   function refRow(h, key, lanes, len, name) {
     len = len || segKm();
@@ -981,13 +992,17 @@ details ul{margin:8px 0 0;padding-left:20px}
     var i = R.info;
     if (i && i.km) {
       h += '<dt>Distancia por carretera</dt><dd>' + f1(i.km) + ' km</dd>';
-      if (i.roads && i.roads.length) h += '<dt>Vías de la ruta</dt><dd>' + i.roads.map(function (r) { return r.name.replace(/[<>&]/g, ''); }).join(' → ') + '</dd>';
       h += '<dt>Sin tráfico, según el mapa</dt><dd>' + f0(i.min) + ' min</dd>';
       h += '<dt>Velocidad de referencia</dt><dd>' + f0(i.km / (i.min / 60)) + ' km/h</dd>';
     } else if (i && i.straight) {
       h += '<dt>Distancia en línea recta</dt><dd>' + f1(i.straight) + ' km</dd>';
     } else h += '<dt>Distancia</dt><dd>' + f1(P.d) + ' km</dd>';
     dl.innerHTML = h;
+    var rb = $('roadsbox');
+    if (i && i.roads && i.roads.length) {
+      rb.hidden = false;
+      rb.innerHTML = '<h3>Vías de la ruta</h3><ol>' + i.roads.map(function (r) { return '<li>' + r.name.replace(/[<>&]/g, '') + ' <span>' + f1(r.km) + ' km</span></li>'; }).join('') + '</ol>';
+    } else { rb.hidden = true; rb.innerHTML = ''; }
   }
   function fitRoute() { if (routeLayer) map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] }); }
   function route() {
@@ -1071,6 +1086,163 @@ details ul{margin:8px 0 0;padding-left:20px}
         hint('Mostrando: ' + (a[0].display_name || q) + '. Toca el mapa sobre la vía para marcar origen y destino.');
       }).catch(function () { hint('No se pudo buscar. Revisen la conexión a internet.'); });
   }
+
+  /* ---------------- Navegación tipo Waze ---------------- */
+  var NAV = { on: false, sim: false, watch: null, timer: null, pos: null, last: 0, lastPos: null, routes: [], cur: 0, layer: null, me: null, path: null, idx: 0, busy: false, lock: null };
+  function navHour() { var h = parseHour($('nav-hour').value); if (isFinite(h)) return h; var d = new Date(); return d.getHours() + d.getMinutes() / 60; }
+  function navSay(cls, title, body) { var el = $('nav-st'); el.hidden = false; el.className = 'navst ' + cls; el.innerHTML = '<b>' + title + '</b>' + body; }
+  /* Tiempo estimado con tráfico: cada tramo con la velocidad que da el modelo para esa vía y esa hora. */
+  function navEst(rt, h) {
+    var v0 = (1 - S.a) * P.vf, vg = vK(kOf(h), S.a, S.c), gf = vg > 0 ? Math.min(3.5, v0 / vg) : 3.5, tot = 0, sat = 0, free = 0;
+    rt.steps.forEach(function (st) {
+      free += st.dur;
+      var key = roadKey(st.name), t = st.dur * gf;
+      if (key && st.dist > 30) {
+        var r = refRow(h, key, LANES[key] || 4, st.dist / 1000, st.name);
+        t = Math.max(st.dur, r.sec);
+        if (r.need > 1.3) sat += st.dist;
+      } else if (vg <= 0) sat += st.dist;
+      tot += t;
+    });
+    return { min: tot / 60, free: free / 60, sat: sat / 1000, ratio: free > 0 ? tot / free : 1 };
+  }
+  function navVerdict(e) {
+    if (e.ratio > 1.6 || e.sat > 0.5) return { c: 'bad', t: 'Ruta no viable ahora' };
+    if (e.ratio > 1.25) return { c: 'mid', t: 'Ruta con tráfico pesado' };
+    return { c: 'ok', t: 'Ruta viable' };
+  }
+  function navParse(j) {
+    return (j.routes || []).map(function (rt) {
+      var c = rt.geometry.coordinates, step = Math.max(1, Math.ceil(c.length / 800)), steps = [], names = {}, order = [];
+      var geom = c.filter(function (_, n) { return n % step === 0 || n === c.length - 1; });
+      (rt.legs || []).forEach(function (lg) { (lg.steps || []).forEach(function (st) {
+        steps.push({ name: (st.name || '').trim(), dist: st.distance || 0, dur: st.duration || 0 });
+        var nm = (st.name || '').trim(); if (nm) { if (names[nm] === undefined) { names[nm] = 0; order.push(nm); } names[nm] += st.distance || 0; }
+      }); });
+      var big = order.filter(function (n) { return names[n] >= 300; });
+      return { geom: geom, km: rt.distance / 1000, min: rt.duration / 60, steps: steps, roads: (big.length ? big : order.slice(0, 3)) };
+    });
+  }
+  function navDist(pt, geom) {
+    var m = Infinity;
+    for (var i = 0; i < geom.length; i++) { var d = haversine(pt, [geom[i][1], geom[i][0]]); if (d < m) m = d; }
+    return m * 1000;
+  }
+  function navDraw() {
+    if (!map) return;
+    if (NAV.layer) map.removeLayer(NAV.layer);
+    NAV.layer = L.layerGroup().addTo(map);
+    NAV.routes.forEach(function (r, i) {
+      if (i === NAV.cur) return;
+      L.polyline(r.geom.map(function (p) { return [p[1], p[0]]; }), { color: '#7A8794', weight: 5, opacity: 0.7, dashArray: '8 8' }).addTo(NAV.layer);
+    });
+    var r = NAV.routes[NAV.cur];
+    if (r) L.polyline(r.geom.map(function (p) { return [p[1], p[0]]; }), { color: '#1F8FD0', weight: 7, opacity: 0.95 }).addTo(NAV.layer);
+    if (NAV.pos) L.circleMarker(NAV.pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#1F6FEB', fillOpacity: 1 }).bindTooltip('Ustedes', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(NAV.layer);
+  }
+  function navCheck(reason) {
+    if (NAV.busy || !NAV.pos || !R.dst) return;
+    NAV.busy = true; NAV.last = Date.now(); NAV.lastPos = NAV.pos;
+    var url = 'https://router.project-osrm.org/route/v1/driving/' + NAV.pos[1] + ',' + NAV.pos[0] + ';' + R.dst[1] + ',' + R.dst[0] + '?overview=full&geometries=geojson&steps=true&alternatives=true';
+    var ctl = new AbortController(), to = setTimeout(function () { ctl.abort(); }, 12000);
+    fetch(url, { signal: ctl.signal }).then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); }).then(function (j) {
+      if (!NAV.on) return;
+      if (j.code !== 'Ok') throw new Error('sin ruta');
+      var h = navHour(), rs = navParse(j);
+      if (!rs.length) throw new Error('sin ruta');
+      var ev = rs.map(function (r) { return navEst(r, h); });
+      /* la ruta que se venía siguiendo es la que más se parece a la anterior */
+      var prev = NAV.routes[NAV.cur], keep = 0;
+      if (prev && reason !== 'fuera') {
+        var best = Infinity; rs.forEach(function (r, i) { var d = r.geom.length ? navDist([prev.geom[Math.floor(prev.geom.length / 2)][1], prev.geom[Math.floor(prev.geom.length / 2)][0]], r.geom) : 1e9; if (d < best) { best = d; keep = i; } });
+        if (best > 150) keep = 0;
+      }
+      var bi = 0; ev.forEach(function (e, i) { if (e.min < ev[bi].min) bi = i; });
+      var msg = '', cls, title, extra = '';
+      var vk = navVerdict(ev[keep]);
+      NAV.routes = rs; NAV.ev = ev; NAV.cur = keep;
+      if (reason === 'fuera') { NAV.cur = bi; keep = bi; vk = navVerdict(ev[bi]); extra = 'Se salieron de la ruta: recalculada. '; }
+      else if (bi !== keep && vk.c === 'bad' && ev[bi].min < ev[keep].min) { NAV.cur = bi; extra = 'La ruta anterior no era viable: cambié a otra. '; vk = navVerdict(ev[bi]); keep = bi; }
+      var e = ev[NAV.cur], r = rs[NAV.cur];
+      cls = vk.c; title = vk.t;
+      msg = extra + 'Faltan <b style="display:inline;font-size:14px">' + f1(r.km) + ' km</b> · llegada en <b style="display:inline;font-size:14px">' + f0(e.min) + ' min</b> con tráfico estimado (' + f0(e.free) + ' min sin tráfico) a las ' + (function (x) { var hh = Math.floor(x), mm = Math.round((x - hh) * 60); if (mm === 60) { hh++; mm = 0; } return hh + ':' + (mm < 10 ? '0' : '') + mm; })(h) + '.';
+      if (e.sat > 0.5) msg += ' Hay ' + f1(e.sat) + ' km donde la demanda supera la capacidad de la vía.';
+      msg += '<br>Por: ' + r.roads.map(function (n) { return n.replace(/[<>&]/g, ''); }).join(' → ');
+      navSay(cls, title, msg);
+      var alts = '';
+      rs.forEach(function (a, i) {
+        if (i === NAV.cur) return;
+        var d = ev[NAV.cur].min - ev[i].min;
+        alts += '<div class="navalt"><span>Alternativa: ' + f1(a.km) + ' km · ' + f0(ev[i].min) + ' min · ' + (d > 0.5 ? 'ahorra ' + f0(d) + ' min' : (d < -0.5 ? 'tarda ' + f0(-d) + ' min más' : 'similar')) + '<br><span class="note">Por: ' + a.roads.slice(0, 3).map(function (n) { return n.replace(/[<>&]/g, ''); }).join(' → ') + '</span></span><button class="btn sec" data-alt="' + i + '" type="button">Tomar</button></div>';
+      });
+      $('nav-alts').innerHTML = alts;
+      navDraw();
+      if (bi === NAV.cur || ev[NAV.cur].min - ev[bi].min < Math.max(2, 0.1 * ev[NAV.cur].min)) { /* nada mejor */ }
+      else navSay(cls, title, msg + '<br><b style="display:inline;font-size:14px">Hay una ruta más rápida: ahorra ' + f0(ev[NAV.cur].min - ev[bi].min) + ' min.</b> Pueden tomarla abajo.');
+    }).catch(function () {
+      if (NAV.on) navSay('mid', 'Sin conexión para recalcular', 'Sigo mostrando su posición. Intento de nuevo en unos segundos.');
+    }).then(function () { clearTimeout(to); NAV.busy = false; });
+  }
+  function navPos(ll) {
+    NAV.pos = ll;
+    if (map) { if (NAV.me) NAV.me = null; map.panTo(ll, { animate: true }); }
+    if (R.dst && haversine(ll, R.dst) * 1000 < 40) { navStop('Llegaron al destino.'); return; }
+    var cur = NAV.routes[NAV.cur], now = Date.now();
+    var gap = NAV.sim ? 4000 : 20000;
+    if (!cur) { navCheck('inicio'); return; }
+    if (navDist(ll, cur.geom) > 80 && now - NAV.last > (NAV.sim ? 1500 : 8000)) { navCheck('fuera'); return; }
+    if (now - NAV.last > gap || (NAV.lastPos && haversine(ll, NAV.lastPos) * 1000 > 250)) navCheck('periodico');
+    else navDraw();
+  }
+  function navStop(why) {
+    NAV.on = false; NAV.sim = false;
+    if (NAV.watch !== null) { navigator.geolocation.clearWatch(NAV.watch); NAV.watch = null; }
+    if (NAV.timer) { clearInterval(NAV.timer); NAV.timer = null; }
+    if (NAV.lock) { try { NAV.lock.release(); } catch (e) {} NAV.lock = null; }
+    $('nav-stop').hidden = true; $('nav-go').disabled = false; $('nav-sim').disabled = false;
+    if (why) navSay('ok', why, '');
+    $('nav-alts').innerHTML = '';
+    if (NAV.layer && map) { map.removeLayer(NAV.layer); NAV.layer = null; }
+    NAV.routes = []; NAV.cur = 0; NAV.pos = null;
+  }
+  function navBegin(sim) {
+    if (!R.dst) { navSay('mid', 'Falta el destino', 'Marquen origen y destino en el mapa (el destino es el punto rojo).'); return; }
+    if (NAV.on) navStop();
+    NAV.on = true; NAV.sim = sim; NAV.routes = []; NAV.cur = 0; NAV.last = 0; NAV.lastPos = null;
+    $('nav-stop').hidden = false; $('nav-go').disabled = true; $('nav-sim').disabled = true;
+    if (map) map.setZoom(Math.max(map.getZoom(), 15));
+    if (sim) {
+      var g = (R.info && R.info.geom) || null;
+      if (!g || g.length < 2) { navStop(); navSay('mid', 'Falta la ruta', 'Primero tracen la ruta con origen y destino (necesita internet).'); return; }
+      var path = [], i, a, b, d, n, k;
+      for (i = 0; i < g.length - 1; i++) {
+        a = [g[i][1], g[i][0]]; b = [g[i + 1][1], g[i + 1][0]]; d = haversine(a, b) * 1000; n = Math.max(1, Math.round(d / 40));
+        for (k = 0; k < n; k++) path.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+      }
+      path.push([g[g.length - 1][1], g[g.length - 1][0]]);
+      NAV.path = path; NAV.idx = 0; navSay('mid', 'Simulando recorrido', 'La posición avanza sola por la ruta, más rápido que en la vida real.');
+      NAV.timer = setInterval(function () { if (!NAV.on) return; NAV.idx += 1; if (NAV.idx >= NAV.path.length) { navStop('Llegaron al destino (simulación).'); return; } navPos(NAV.path[NAV.idx]); }, 700);
+      navPos(path[0]);
+    } else {
+      if (!navigator.geolocation) { navStop(); navSay('bad', 'Este dispositivo no tiene GPS en el navegador', 'Usen «Simular recorrido».'); return; }
+      navSay('mid', 'Buscando su ubicación…', 'Acepten el permiso de ubicación del navegador. Mantengan esta pantalla abierta mientras se mueven.');
+      NAV.watch = navigator.geolocation.watchPosition(function (p) { if (NAV.on) navPos([p.coords.latitude, p.coords.longitude]); }, function (er) {
+        if (er && er.code === 1) { navStop(); navSay('bad', 'Permiso de ubicación denegado', 'Activen la ubicación del navegador para este sitio, o usen «Simular recorrido».'); }
+        else if (NAV.on && !NAV.pos) navSay('mid', 'Sin señal de GPS por ahora', 'Sigo intentando. Si están bajo techo o en un túnel, puede tardar.');
+      }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+      try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { NAV.lock = l; }, function () {}); } catch (e) {}
+    }
+  }
+  $('nav-go').addEventListener('click', function () { navBegin(false); });
+  $('nav-sim').addEventListener('click', function () { navBegin(true); });
+  $('nav-stop').addEventListener('click', function () { navStop('Navegación detenida.'); });
+  $('nav-alts').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-alt]'); if (!b) return;
+    NAV.cur = +b.getAttribute('data-alt'); NAV.last = Date.now();
+    var r = NAV.routes[NAV.cur], ev = NAV.ev[NAV.cur], vk = navVerdict(ev);
+    navSay(vk.c, vk.t, 'Tomaron otra ruta. Faltan ' + f1(r.km) + ' km · ' + f0(ev.min) + ' min con tráfico estimado.<br>Por: ' + r.roads.map(function (n) { return n.replace(/[<>&]/g, ''); }).join(' → '));
+    $('nav-alts').innerHTML = ''; navDraw();
+  });
   function initMap() {
     if (typeof L === 'undefined') { $('map').textContent = 'No se pudo cargar el mapa.'; return; }
     map = L.map('map').setView(GT, 12);
