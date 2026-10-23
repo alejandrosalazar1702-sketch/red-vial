@@ -74,6 +74,17 @@ input[type=text],input[type=search],input[type=number],input[type=time],select{f
 .note{color:var(--muted);font-size:13px}
 .msg{font-size:13.5px;color:var(--crit);min-height:1.2em;margin-top:6px}
 
+/* Modo usuario / equipo */
+body:not(.team) .tabs,body:not(.team) #ave,body:not(.team) #vpanel,body:not(.team) #nextpanel,body:not(.team) .pill,body:not(.team) .hide-user{display:none!important}
+body:not(.team) .top .brand p{display:none}
+.lockmsg{display:none;margin:0 0 12px;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+body.lock .lockmsg{display:block}
+.sugg{display:flex;flex-direction:column;margin-top:6px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.sugg button{font:inherit;font-size:14px;text-align:left;color:var(--ink);background:var(--surface);border:0;border-bottom:1px solid var(--line);padding:10px 12px;cursor:pointer}
+.sugg button:last-child{border-bottom:0}
+.sugg button:hover{background:var(--accent-soft)}
+#adv-wrap{display:inline-flex;align-items:center;gap:6px}
+#adv-wrap[hidden],.sugg[hidden]{display:none}
 /* Mapa */
 .roadsbox{margin-top:12px;border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--bg)}
 .roadsbox h3{font-size:13px;color:var(--muted);font-weight:600;margin:0 0 6px}
@@ -214,6 +225,8 @@ details ul{margin:8px 0 0;padding-left:20px}
     </div>
     <div class="acts">
       <span class="pill" id="pill"></span>
+      <label class="chip" id="adv-wrap" hidden><input type="checkbox" id="adv"> Editar valores</label>
+      <button class="chip" id="btn-team" type="button" aria-pressed="false">Equipo</button>
       <button class="chip" id="btn-qr" type="button">Código QR</button>
     </div>
   </header>
@@ -229,15 +242,16 @@ details ul{margin:8px 0 0;padding-left:20px}
     <div class="mapgrid">
       <div class="panel">
         <form id="f-search" class="search" role="search">
-          <input id="q" type="search" placeholder="Buscar calle o lugar" aria-label="Buscar una calle o un lugar" autocomplete="off">
+          <input id="q" type="search" placeholder="¿A dónde vas?" aria-label="Buscar el destino" autocomplete="off">
           <button class="btn" type="submit">Buscar</button>
         </form>
+        <div class="sugg" id="sugg" hidden></div>
         <div class="ave" id="ave" role="group" aria-label="Vías principales"></div>
         <div id="map" role="application" aria-label="Mapa de la Ciudad de Guatemala"></div>
         <p class="maphint" id="maphint" aria-live="polite"></p>
       </div>
       <aside class="stack">
-        <div class="panel">
+        <div class="panel" id="vpanel">
           <h2>Vía activa</h2>
           <div class="fld"><label for="rname">Nombre de la vía</label><input id="rname" type="text" maxlength="40" autocomplete="off"></div>
           <div class="saved" id="saved" role="group" aria-label="Vías guardadas"></div>
@@ -252,17 +266,17 @@ details ul{margin:8px 0 0;padding-left:20px}
         </div>
         <div class="panel" id="navpanel">
           <h2>Navegación</h2>
-          <p class="note" style="margin-bottom:10px">Marquen el destino. Al iniciar, la app sigue su posición, calcula si la ruta es viable a esa hora y recalcula si conviene otra.</p>
-          <div class="fld"><label for="nav-hour">Hora para el cálculo (vacío = ahora)</label><input id="nav-hour" type="time"></div>
+          <p class="note" id="nav-intro" style="margin-bottom:10px">Busquen su destino o tóquenlo en el mapa. La app toma su ubicación como salida, dice si la ruta es viable a esa hora y recalcula si conviene otra.</p>
+          <div class="fld hide-user"><label for="nav-hour">Hora para el cálculo (vacío = ahora)</label><input id="nav-hour" type="time"></div>
           <div class="row" style="margin-top:10px">
             <button class="btn" id="nav-go" type="button">Iniciar con GPS</button>
-            <button class="btn sec" id="nav-sim" type="button">Simular recorrido</button>
+            <button class="btn sec hide-user" id="nav-sim" type="button">Simular recorrido</button>
             <button class="btn sec bad" id="nav-stop" type="button" hidden>Detener</button>
           </div>
           <div class="navst" id="nav-st" aria-live="polite" hidden></div>
           <div id="nav-alts"></div>
         </div>
-        <div class="panel">
+        <div class="panel" id="nextpanel">
           <h2>Siguiente paso</h2>
           <p style="margin-bottom:12px">Midan la vía en el lugar: cuenten vehículos y cronometren un tramo a distintas horas.</p>
           <button class="btn" id="go-meds" type="button">Ir a mediciones</button>
@@ -273,6 +287,7 @@ details ul{margin:8px 0 0;padding-left:20px}
 
   <!-- ============ MEDICIONES ============ -->
   <section id="tab-meds" role="tabpanel" aria-labelledby="tb-meds" hidden>
+    <p class="note lockmsg">Valores calculados automáticamente a partir de la ruta elegida en el mapa. Solo lectura; el equipo puede activar «Editar valores» arriba.</p>
     <div class="stack">
       <div class="panel">
         <h2>Autollenar con datos de referencia</h2>
@@ -338,6 +353,7 @@ details ul{margin:8px 0 0;padding-left:20px}
 
   <!-- ============ SIMULADOR ============ -->
   <section id="tab-sim" role="tabpanel" aria-labelledby="tb-sim" hidden>
+    <p class="note lockmsg">Valores calculados automáticamente a partir de la ruta elegida en el mapa. Solo lectura; el equipo puede activar «Editar valores» arriba.</p>
     <div class="app">
       <aside class="stack">
         <section class="panel" aria-labelledby="t-esc">
@@ -828,10 +844,10 @@ details ul{margin:8px 0 0;padding-left:20px}
     'Calzada Roosevelt': [4500, 12500], 'Calzada Aguilar Batres': [4200, 10000], 'Calzada San Juan': [3800, 8500],
     'Carretera a El Salvador': [3500, 8000], 'Bulevar Liberación': [5000, 11000], 'Avenida Petapa': [3000, 7000],
     'Calzada Atanasio Tzul': [2500, 5500], 'Bulevar Los Próceres': [3000, 6500], 'Avenida Las Américas': [2000, 4500],
-    'Anillo Periférico': [1500, 3500]
+    'Anillo Periférico': [1500, 3500], 'Vía urbana (genérica)': [2500, 5500]
   };
   var LANES = { 'Calzada Roosevelt': 6, 'Calzada Aguilar Batres': 6, 'Calzada San Juan': 4, 'Carretera a El Salvador': 6, 'Bulevar Liberación': 6,
-    'Avenida Petapa': 4, 'Calzada Atanasio Tzul': 4, 'Bulevar Los Próceres': 6, 'Avenida Las Américas': 4, 'Anillo Periférico': 6 };
+    'Avenida Petapa': 4, 'Calzada Atanasio Tzul': 4, 'Bulevar Los Próceres': 6, 'Avenida Las Américas': 4, 'Anillo Periférico': 6, 'Vía urbana (genérica)': 4 };
   /* Supuesto del equipo de trabajo: de noche circula un 30 % del flujo de horario normal. */
   function dayF(h) { if (h < 4.5 || h >= 22) return 0.3; if (h < 6) return 0.3 + 0.7 * (h - 4.5) / 1.5; if (h > 20) return 1 - 0.7 * (h - 20) / 2; return 1; }
   var segManual = false;
@@ -847,7 +863,7 @@ details ul{margin:8px 0 0;padding-left:20px}
   /* La vía elegida en la lista: su nombre, si tenemos cifras de referencia (key) y cuántos km recorre la ruta por ella. */
   function curRoad() {
     var name = $('ref-road').value, km = null;
-    if (R && R.info && R.info.roads) R.info.roads.forEach(function (r) { if (r.name === name) km = r.km; });
+    if (R && R.info && R.info.roads) R.info.roads.forEach(function (r) { if (r.name === name || roadKey(r.name) === name) km = (km || 0) + r.km; });
     return { name: name, key: roadKey(name), km: km };
   }
   function roadOsm(name) { return (R && R.osm && R.osm.roads && R.osm.roads[name]) || null; }
@@ -874,6 +890,13 @@ details ul{margin:8px 0 0;padding-left:20px}
     if (q > top) { q = top; cap = true; }
     var disc = Math.sqrt(Math.max(0, 1 - q / qmax)), k = (P.kj / 2) * (1 + (sh > 0.5 ? 1 : -1) * disc), v = q / k;
     return { h: h, count: Math.max(1, Math.round(q / 2)), win: 30, len: len, sec: Math.max(1, Math.round(len * 3600 / v)), ref: true, cap: cap, road: name || key, need: need };
+  }
+  /* La vía de referencia se elige sola: la de la lista por la que la ruta recorre más kilómetros. */
+  function autoRoad() {
+    var acc = {}, best = null;
+    if (R && R.info && R.info.roads) R.info.roads.forEach(function (r) { var k = roadKey(r.name); if (k) acc[k] = (acc[k] || 0) + r.km; });
+    Object.keys(acc).forEach(function (k) { if (best === null || acc[k] > acc[best]) best = k; });
+    $('ref-road').value = best || 'Vía urbana (genérica)';
   }
   var auto = null;
   function fillAuto() {
@@ -1027,7 +1050,8 @@ details ul{margin:8px 0 0;padding-left:20px}
       R.info = { km: rt.distance / 1000, min: rt.duration / 60, geom: g, roads: big };
       var km = Math.round(R.info.km * 10) / 10; if (km >= 0.1) setVal('d', km);
       drawMap(); fitRoute(); renderRoute(); updatePill(); stateHint(); persist();
-      R.osm = undefined; segManual = false; populateRoads(); setLanes(false); $('m-len').value = segKm(); fillAuto(); applyRefParams(); roadInfo(R);
+      R.osm = undefined; segManual = false; populateRoads(); autoRoad(); setLanes(false); $('m-len').value = segKm(); fillAuto(); (function () { var br = $('b-ref'), dd = br.disabled; br.disabled = false; br.click(); br.disabled = dd; })(); roadInfo(R);
+      navPreview();
     }).catch(function () {
       if (R.o !== o0 || R.dst !== d0) return;
       R.info = { km: null, straight: haversine(R.o, R.dst) };
@@ -1140,13 +1164,13 @@ details ul{margin:8px 0 0;padding-left:20px}
     if (r) L.polyline(r.geom.map(function (p) { return [p[1], p[0]]; }), { color: '#1F8FD0', weight: 7, opacity: 0.95 }).addTo(NAV.layer);
     if (NAV.pos) L.circleMarker(NAV.pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#1F6FEB', fillOpacity: 1 }).bindTooltip('Ustedes', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(NAV.layer);
   }
-  function navCheck(reason) {
+  function navCheck(reason, prev0) {
     if (NAV.busy || !NAV.pos || !R.dst) return;
     NAV.busy = true; NAV.last = Date.now(); NAV.lastPos = NAV.pos;
     var url = 'https://router.project-osrm.org/route/v1/driving/' + NAV.pos[1] + ',' + NAV.pos[0] + ';' + R.dst[1] + ',' + R.dst[0] + '?overview=full&geometries=geojson&steps=true&alternatives=true';
     var ctl = new AbortController(), to = setTimeout(function () { ctl.abort(); }, 12000);
     fetch(url, { signal: ctl.signal }).then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); }).then(function (j) {
-      if (!NAV.on) return;
+      if (!NAV.on && !prev0) return;
       if (j.code !== 'Ok') throw new Error('sin ruta');
       var h = navHour(), rs = navParse(j);
       if (!rs.length) throw new Error('sin ruta');
@@ -1180,8 +1204,15 @@ details ul{margin:8px 0 0;padding-left:20px}
       if (bi === NAV.cur || ev[NAV.cur].min - ev[bi].min < Math.max(2, 0.1 * ev[NAV.cur].min)) { /* nada mejor */ }
       else navSay(cls, title, msg + '<br><b style="display:inline;font-size:14px">Hay una ruta más rápida: ahorra ' + f0(ev[NAV.cur].min - ev[bi].min) + ' min.</b> Pueden tomarla abajo.');
     }).catch(function () {
-      if (NAV.on) navSay('mid', 'Sin conexión para recalcular', 'Sigo mostrando su posición. Intento de nuevo en unos segundos.');
+      if (NAV.on || prev0) navSay('mid', 'Sin conexión para recalcular', 'Sigo mostrando su posición. Intento de nuevo en unos segundos.');
     }).then(function () { clearTimeout(to); NAV.busy = false; });
+  }
+  /* Vista previa antes de salir: evalúa la ruta desde la ubicación (o el origen marcado) hasta el destino. */
+  function navPreview() {
+    if (NAV.on || !R || !R.dst) return;
+    var o = ME || R.o; if (!o) return;
+    NAV.pos = o; NAV.routes = []; NAV.cur = 0; NAV.last = 0; NAV.lastPos = null;
+    navCheck('vista', true);
   }
   function navPos(ll) {
     NAV.pos = ll;
@@ -1251,6 +1282,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     map.on('click', function (e) {
       if (routing) return;
       var ll = [Math.round(e.latlng.lat * 1e6) / 1e6, Math.round(e.latlng.lng * 1e6) / 1e6];
+      if (!TEAM) { if (NAV.on) return; if (R.dst && !R.o) { R.o = ll; drawMap(); route(); } else setDest(ll); persist(); return; }
       if (!R.o || (R.o && R.dst)) { R.o = ll; R.dst = null; R.info = null; drawMap(); renderRoute(); stateHint(); }
       else { R.dst = ll; drawMap(); route(); }
       persist();
@@ -1261,7 +1293,58 @@ details ul{margin:8px 0 0;padding-left:20px}
     b.addEventListener('click', function () { $('q').value = n; search(n); });
     $('ave').appendChild(b);
   });
-  $('f-search').addEventListener('submit', function (e) { e.preventDefault(); search($('q').value); });
+  $('f-search').addEventListener('submit', function (e) { e.preventDefault(); if (TEAM) search($('q').value); else suggest($('q').value); });
+  var ME = null;
+  function whereAmI(cb) {
+    if (!navigator.geolocation) { cb(null); return; }
+    navigator.geolocation.getCurrentPosition(function (p) { ME = [Math.round(p.coords.latitude * 1e6) / 1e6, Math.round(p.coords.longitude * 1e6) / 1e6]; cb(ME); }, function () { cb(null); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 12000 });
+  }
+  /* Elegir destino: la salida es la ubicación actual; si no hay GPS, se pide tocar el mapa. */
+  function setDest(ll) {
+    R.dst = ll; R.info = null; $('sugg').hidden = true;
+    function go(o) {
+      if (!o) { R.o = null; drawMap(); renderRoute(); hint('No pude ubicarlos. Toquen en el mapa su punto de salida (o activen la ubicación del navegador).'); persist(); return; }
+      R.o = o; drawMap(); route(); persist();
+    }
+    if (ME) go(ME); else { hint('Buscando su ubicación…'); whereAmI(go); }
+    drawMap();
+  }
+  function suggest(q) {
+    q = (q || '').trim(); if (!q) return;
+    var box = $('sugg'); hint('Buscando…');
+    fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=gt&accept-language=es&q=' + encodeURIComponent(q + ', Guatemala')).then(function (r) { return r.json(); }).then(function (a) {
+      box.innerHTML = '';
+      if (!a.length) { box.hidden = true; hint('No encontré ese lugar. Prueben con otro nombre.'); return; }
+      a.forEach(function (x) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = (x.display_name || q).split(',').slice(0, 3).join(',');
+        b.addEventListener('click', function () { var ll = [Math.round(+x.lat * 1e6) / 1e6, Math.round(+x.lon * 1e6) / 1e6]; if (map) map.setView(ll, 14); setDest(ll); });
+        box.appendChild(b);
+      });
+      box.hidden = false; hint('Elijan su destino de la lista.');
+    }).catch(function () { hint('No se pudo buscar. Revisen la conexión a internet.'); });
+  }
+  /* Modo usuario (limpio) y modo equipo (pestañas y datos). Los valores quedan bloqueados salvo «Editar valores». */
+  var TEAM = false, ADV = false;
+  try { TEAM = localStorage.getItem('redvial.team') === '1'; ADV = localStorage.getItem('redvial.adv') === '1'; } catch (e) {}
+  function lockForms() {
+    ['tab-meds', 'tab-sim'].forEach(function (id) {
+      var els = $(id).querySelectorAll('input,select,button,textarea');
+      Array.prototype.forEach.call(els, function (el) {
+        if (!ADV) { if (!el.disabled) { el.disabled = true; el.setAttribute('data-lk', '1'); } }
+        else if (el.getAttribute('data-lk')) { el.disabled = false; el.removeAttribute('data-lk'); }
+      });
+    });
+  }
+  function applyMode() {
+    document.body.classList.toggle('team', TEAM); document.body.classList.toggle('lock', !ADV);
+    $('btn-team').setAttribute('aria-pressed', TEAM ? 'true' : 'false'); $('btn-team').textContent = TEAM ? 'Vista usuario' : 'Equipo';
+    $('adv-wrap').hidden = !TEAM; $('adv').checked = ADV;
+    lockForms(); if (!TEAM) showTab('mapa');
+    if (map) setTimeout(function () { map.invalidateSize(); }, 30);
+  }
+  $('btn-team').addEventListener('click', function () { TEAM = !TEAM; try { localStorage.setItem('redvial.team', TEAM ? '1' : '0'); } catch (e) {} applyMode(); });
+  $('adv').addEventListener('change', function () { ADV = $('adv').checked; try { localStorage.setItem('redvial.adv', ADV ? '1' : '0'); } catch (e) {} applyMode(); });
+  ['tab-meds', 'tab-sim'].forEach(function (id) { new MutationObserver(function () { if (!ADV) lockForms(); }).observe($(id), { childList: true, subtree: true }); });
   $('b-clear').addEventListener('click', function () { R.o = null; R.dst = null; R.info = null; R.osm = undefined; segManual = false; populateRoads(); setLanes(false); $('m-len').value = 1; fillAuto(); $('par-src').textContent = ''; drawMap(); renderRoute(); stateHint(); persist(); });
 
   /* ---------------- Vías guardadas ---------------- */
@@ -1458,7 +1541,9 @@ details ul{margin:8px 0 0;padding-left:20px}
   if (!names.length) { db.routes['Mi vía'] = newRoute(); names = ['Mi vía']; }
   activate(db.routes[db.active] ? db.active : names[0]);
   var hash = (location.hash || '').replace('#', '');
-  if (TABS.indexOf(hash) > 0) showTab(hash);
+  if (TEAM && TABS.indexOf(hash) > 0) showTab(hash);
+  applyMode();
+  if (!TEAM && !(R.info && R.info.geom)) whereAmI(function (o) { if (o && map) map.setView(o, 14); });
   if (('serviceWorker' in navigator) && location.protocol.indexOf('http') === 0) {
     /* Se actualiza sola: busca una versión nueva al abrir y cada vez que vuelven a la app, y recarga una vez si la encuentra. */
     var hadSW = !!navigator.serviceWorker.controller, reloaded = false;
