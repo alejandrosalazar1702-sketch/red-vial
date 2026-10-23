@@ -282,7 +282,7 @@ details ul{margin:8px 0 0;padding-left:20px}
         <div class="panel" id="navpanel">
           <h2>¿Cómo llegar?</h2>
           <div class="od" id="od" hidden>
-            <div><i class="dot a"></i><span id="od-o">Su ubicación</span></div>
+            <div id="od-orow" role="button" tabindex="0" style="cursor:pointer" title="Tocar para cambiar la salida"><i class="dot a"></i><span id="od-o">Su ubicación</span><small class="note" style="margin-left:auto">Cambiar</small></div>
             <div><i class="dot b"></i><span id="od-d"></span></div>
           </div>
           <p class="note" id="nav-intro" style="margin-bottom:10px">Busquen su destino o tóquenlo en el mapa. La salida es su ubicación.</p>
@@ -1022,7 +1022,7 @@ details ul{margin:8px 0 0;padding-left:20px}
   }
   function navRows() {
     var on = !!(R && R.dst); $('od').hidden = !on; $('nav-intro').hidden = on;
-    if (on) { $('od-o').textContent = (ME && R.o && ME[0] === R.o[0] && ME[1] === R.o[1]) ? 'Su ubicación' : (R.o ? 'Punto de salida marcado' : 'Falta la salida'); $('od-d').textContent = R.dstName || 'Destino en el mapa'; }
+    if (on) { $('od-o').textContent = PICK_O ? 'Toquen la salida en el mapa…' : (ME && R.o && ME[0] === R.o[0] && ME[1] === R.o[1]) ? 'Su ubicación' + (MEACC > 1000 ? ' (±' + f1(MEACC / 1000) + ' km)' : '') : (R.o ? 'Punto de salida marcado' : 'Falta la salida'); $('od-d').textContent = R.dstName || 'Destino en el mapa'; }
   }
   function drawMap() {
     navRows();
@@ -1267,7 +1267,9 @@ details ul{margin:8px 0 0;padding-left:20px}
     });
     $('nav-alts').innerHTML = h;
     var cur = rs[NAV.cur], e = ev[NAV.cur];
-    if (NAV.on) {
+    var near = R && R.dst && NAV.pos && haversine(NAV.pos, R.dst) < 0.5;
+    if (near && !NAV.on) navSay('mid', 'La salida está junto al destino', 'Según el navegador, su ubicación está a menos de 500 m del destino' + (MEACC > 300 ? ' (precisión ±' + f0(MEACC) + ' m)' : '') + '. Si no es así, toquen «Su ubicación» arriba y marquen la salida en el mapa.');
+    else if (NAV.on) {
       var vk = navVerdict(e), bold = function (t) { return '<b style="display:inline;font-size:14px">' + t + '</b>'; };
       var msg = (extra || '') + 'Faltan ' + bold(f1(cur.km) + ' km') + ' · llegada a las ' + bold(fmt12(hs[NAV.cur] + e.min / 60)) + ' (' + f0(e.min) + ' min con tráfico estimado).';
       if (e.sat > 0.5) msg += ' Hay ' + f1(e.sat) + ' km donde la demanda supera la capacidad de la vía.';
@@ -1346,7 +1348,7 @@ details ul{margin:8px 0 0;padding-left:20px}
   /* Vista previa antes de salir: evalúa la ruta desde la ubicación (o el origen marcado) hasta el destino. */
   function navPreview() {
     if (NAV.on || !R || !R.dst) return;
-    var o = ME || R.o; if (!o) return;
+    var o = R.o || ME; if (!o) return;
     NAV.pos = o; NAV.routes = []; NAV.cur = 0; NAV.last = 0; NAV.lastPos = null;
     navCheck('vista', true);
   }
@@ -1441,6 +1443,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     map.on('click', function (e) {
       if (routing) return;
       var ll = [Math.round(e.latlng.lat * 1e6) / 1e6, Math.round(e.latlng.lng * 1e6) / 1e6];
+      if (!TEAM && PICK_O) { PICK_O = false; R.o = ll; ME = ME; R.info = null; drawMap(); route(); persist(); return; }
       if (!TEAM) { if (NAV.on) return; if (R.dst && !R.o) { R.o = ll; drawMap(); route(); } else setDest(ll); persist(); return; }
       if (!R.o || (R.o && R.dst)) { R.o = ll; R.dst = null; R.info = null; drawMap(); renderRoute(); stateHint(); }
       else { R.dst = ll; drawMap(); route(); }
@@ -1453,10 +1456,10 @@ details ul{margin:8px 0 0;padding-left:20px}
     $('ave').appendChild(b);
   });
   $('f-search').addEventListener('submit', function (e) { e.preventDefault(); if (TEAM) search($('q').value); else suggest($('q').value); });
-  var ME = null;
+  var ME = null, MEACC = 0, PICK_O = false;
   function whereAmI(cb) {
     if (!navigator.geolocation) { cb(null); return; }
-    navigator.geolocation.getCurrentPosition(function (p) { ME = [Math.round(p.coords.latitude * 1e6) / 1e6, Math.round(p.coords.longitude * 1e6) / 1e6]; cb(ME); }, function () { cb(null); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 12000 });
+    navigator.geolocation.getCurrentPosition(function (p) { ME = [Math.round(p.coords.latitude * 1e6) / 1e6, Math.round(p.coords.longitude * 1e6) / 1e6]; MEACC = p.coords.accuracy || 0; cb(ME); }, function () { cb(null); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 12000 });
   }
   /* Elegir destino: la salida es la ubicación actual; si no hay GPS, se pide tocar el mapa. */
   function setDest(ll, name) {
@@ -1468,6 +1471,9 @@ details ul{margin:8px 0 0;padding-left:20px}
     if (ME) go(ME); else { hint('Buscando su ubicación…'); whereAmI(go); }
     drawMap();
   }
+  function pickOrigin() { if (NAV.on || !R.dst) return; PICK_O = true; navRows(); hint('Toquen en el mapa el punto de salida.'); }
+  $('od-orow').addEventListener('click', pickOrigin);
+  $('od-orow').addEventListener('keydown', function (e) { if (e.key === 'Enter') pickOrigin(); });
   function suggest(q) {
     q = (q || '').trim(); if (!q) return;
     var box = $('sugg'); hint('Buscando…');
