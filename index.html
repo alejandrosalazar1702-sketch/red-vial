@@ -29,7 +29,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font
 .wrap{max-width:1120px;margin-inline:auto}
 h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,6vw,42px);line-height:1;letter-spacing:.01em;margin:0;text-transform:uppercase}
 h1{display:flex;align-items:center}
-.wm{display:block;width:min(300px,80vw);height:auto;mix-blend-mode:multiply}
+.wm{display:block;width:min(210px,60vw);height:auto;mix-blend-mode:multiply}
 h2{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 10px}
 h3{font-family:var(--display);font-weight:600;font-size:18px;letter-spacing:.03em;margin:0}
 p{margin:0}
@@ -259,7 +259,9 @@ details ul{margin:8px 0 0;padding-left:20px}
         <form id="f-search" class="search" role="search">
           <input id="q" type="search" placeholder="¿A dónde vas?" aria-label="Buscar el destino" autocomplete="off">
           <button class="btn" type="submit">Buscar</button>
+          <button class="btn sec" type="button" id="b-me" title="Usar mi ubicación" aria-label="Usar mi ubicación">📍</button>
         </form>
+        <p class="note" id="loc-st" style="margin-top:6px">Detectando su ubicación…</p>
         <div class="sugg" id="sugg" hidden></div>
         <div class="ave" id="ave" role="group" aria-label="Vías principales"></div>
         <div id="map" role="application" aria-label="Mapa de la Ciudad de Guatemala"></div>
@@ -1461,6 +1463,38 @@ details ul{margin:8px 0 0;padding-left:20px}
     if (!navigator.geolocation) { cb(null); return; }
     navigator.geolocation.getCurrentPosition(function (p) { ME = [Math.round(p.coords.latitude * 1e6) / 1e6, Math.round(p.coords.longitude * 1e6) / 1e6]; MEACC = p.coords.accuracy || 0; cb(ME); }, function () { cb(null); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 12000 });
   }
+  /* Ubicación automática: sigue al usuario, dibuja su punto y la usa como salida salvo que elija otra a mano. */
+  var meLayer = null, firstFix = true;
+  function drawMe() {
+    if (!map || !ME) return;
+    if (meLayer) map.removeLayer(meLayer);
+    meLayer = L.layerGroup().addTo(map);
+    if (MEACC > 30) L.circle(ME, { radius: Math.min(MEACC, 5000), color: '#1F6FEB', weight: 1, fillColor: '#1F6FEB', fillOpacity: 0.12, interactive: false }).addTo(meLayer);
+    L.circleMarker(ME, { radius: 8, color: '#fff', weight: 3, fillColor: '#1F6FEB', fillOpacity: 1, interactive: false }).addTo(meLayer);
+  }
+  function locMsg() {
+    var el = $('loc-st');
+    if (!ME) { el.textContent = 'No pude detectar su ubicación. Activen el permiso de ubicación del navegador, o elijan la salida en el mapa.'; return; }
+    el.textContent = 'Ubicación detectada' + (MEACC > 0 ? ' (±' + (MEACC >= 1000 ? f1(MEACC / 1000) + ' km' : f0(MEACC) + ' m') + ')' : '') + (MEACC > 1500 ? '. Es poco precisa: pueden cambiar la salida tocando «Su ubicación».' : '.');
+  }
+  function startLocate() {
+    if (!navigator.geolocation) { locMsg(); return; }
+    navigator.geolocation.watchPosition(function (p) {
+      ME = [Math.round(p.coords.latitude * 1e6) / 1e6, Math.round(p.coords.longitude * 1e6) / 1e6]; MEACC = p.coords.accuracy || 0;
+      drawMe(); locMsg();
+      if (firstFix) { firstFix = false; if (map && !(R.info && R.info.geom) && !R.dst) map.setView(ME, 14); if (R.dst && !R.o) { R.o = ME; drawMap(); route(); persist(); } }
+      navRows();
+    }, function (er) { if (!ME) locMsg(); }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
+  }
+  $('b-me').addEventListener('click', function () {
+    if (!ME) { whereAmI(function (o) { if (o) { drawMe(); locMsg(); useMe(); } else locMsg(); }); return; }
+    useMe();
+  });
+  function useMe() {
+    if (map) map.setView(ME, 15);
+    if (R.dst && !NAV.on) { PICK_O = false; R.o = ME; R.info = null; drawMap(); route(); persist(); }
+    navRows();
+  }
   /* Elegir destino: la salida es la ubicación actual; si no hay GPS, se pide tocar el mapa. */
   function setDest(ll, name) {
     R.dst = ll; R.dstName = name || null; NAV.vias = []; $('via-msg').textContent = ''; R.info = null; $('sugg').hidden = true;
@@ -1708,7 +1742,7 @@ details ul{margin:8px 0 0;padding-left:20px}
   var hash = (location.hash || '').replace('#', '');
   if (TEAM && TABS.indexOf(hash) > 0) showTab(hash);
   applyMode();
-  if (!TEAM && !(R.info && R.info.geom)) whereAmI(function (o) { if (o && map) map.setView(o, 14); });
+  startLocate();
   if (('serviceWorker' in navigator) && location.protocol.indexOf('http') === 0) {
     /* Se actualiza sola: busca una versión nueva al abrir y cada vez que vuelven a la app, y recarga una vez si la encuentra. */
     var hadSW = !!navigator.serviceWorker.controller, reloaded = false;
