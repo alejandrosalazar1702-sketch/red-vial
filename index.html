@@ -79,6 +79,28 @@ body:not(.team) .tabs,body:not(.team) #ave,body:not(.team) #vpanel,body:not(.tea
 body:not(.team) .top .brand p{display:none}
 .lockmsg{display:none;margin:0 0 12px;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
 body.lock .lockmsg{display:block}
+#navpanel{border-top:4px solid #6B2FD6}
+.od{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.od>div{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:14.5px}
+.od .dot{width:12px;height:12px;border-radius:50%;flex:none}
+.od .dot.a{background:#1F6FEB;box-shadow:0 0 0 4px rgba(31,111,235,.25)}
+.od .dot.b{background:#D93025;box-shadow:0 0 0 4px rgba(217,48,37,.2)}
+.btn.go{font-size:16px;padding:10px 20px;background:#6B2FD6;border-color:#6B2FD6;color:#fff}
+.rt{margin-top:10px;border:1px solid var(--line);border-left-width:6px;border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--surface)}
+.rt.v-ok{border-left-color:#1B9E5A}.rt.v-mid{border-left-color:#E0A100}.rt.v-bad{border-left-color:#D93025}
+.rt.sel{box-shadow:0 0 0 2px #6B2FD6;background:var(--accent-soft)}
+.rt-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rt-n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#6B2FD6;color:#fff;font-weight:700;font-size:13px}
+.rt-min{font-size:22px}
+.rt-arr{font-size:13px;color:var(--muted)}
+.rt-best{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.05em;color:#fff;background:#1B9E5A;border-radius:4px;padding:2px 7px}
+.rt-via{margin-top:4px;font-size:14.5px}
+.rt-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--muted)}
+.tag.ok{background:#1B9E5A;border-color:#1B9E5A;color:#fff}.tag.mid{background:#E0A100;border-color:#E0A100;color:#1b1b1b}.tag.bad{background:#D93025;border-color:#D93025;color:#fff}
+.rt-more{margin-top:8px;font:inherit;font-size:13px;color:#6B2FD6;background:none;border:0;padding:2px 0;cursor:pointer;text-decoration:underline}
+.rt-det{margin-top:8px;border-top:1px dashed var(--line);padding-top:8px}
+.rt-roads{margin:4px 0 0;padding-left:20px;font-size:13.5px}.rt-roads li span{color:var(--muted);font-size:12.5px}
 .emo{background:none;border:0}
 .emo span{display:block;font-size:30px;line-height:34px;text-align:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
 .sugg{display:flex;flex-direction:column;margin-top:6px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
@@ -267,11 +289,15 @@ details ul{margin:8px 0 0;padding-left:20px}
           <p class="note" style="margin-top:12px">Marca el origen y el destino sobre la vía que van a estudiar. La distancia se calcula por carretera y pasa sola al simulador. Cada vía guarda sus propios parámetros y mediciones en este dispositivo.</p>
         </div>
         <div class="panel" id="navpanel">
-          <h2>Navegación</h2>
-          <p class="note" id="nav-intro" style="margin-bottom:10px">Busquen su destino o tóquenlo en el mapa. La app toma su ubicación como salida, dice si la ruta es viable a esa hora y recalcula si conviene otra.</p>
-          <div class="fld hide-user"><label for="nav-hour">Hora para el cálculo (vacío = ahora)</label><input id="nav-hour" type="time"></div>
+          <h2>¿Cómo llegar?</h2>
+          <div class="od" id="od" hidden>
+            <div><i class="dot a"></i><span id="od-o">Su ubicación</span></div>
+            <div><i class="dot b"></i><span id="od-d"></span></div>
+          </div>
+          <p class="note" id="nav-intro" style="margin-bottom:10px">Busquen su destino o tóquenlo en el mapa. La salida es su ubicación.</p>
+          <div class="fld"><label for="nav-mode">Salida</label><div class="row" style="flex-wrap:nowrap"><select id="nav-mode"><option value="now">Salir ahora</option><option value="dep">Salir a las</option><option value="arr">Llegar a las</option></select><input id="nav-hour" type="time" aria-label="Hora" hidden></div></div>
           <div class="row" style="margin-top:10px">
-            <button class="btn" id="nav-go" type="button">Iniciar con GPS</button>
+            <button class="btn go" id="nav-go" type="button">Iniciar con GPS</button>
             <button class="btn sec hide-user" id="nav-sim" type="button">Simular recorrido</button>
             <button class="btn sec bad" id="nav-stop" type="button" hidden>Detener</button>
             <button class="btn sec" id="nav-new" type="button" hidden>Nueva ruta</button>
@@ -1000,7 +1026,12 @@ details ul{margin:8px 0 0;padding-left:20px}
     var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
     return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
   }
+  function navRows() {
+    var on = !!(R && R.dst); $('od').hidden = !on; $('nav-intro').hidden = on;
+    if (on) { $('od-o').textContent = (ME && R.o && ME[0] === R.o[0] && ME[1] === R.o[1]) ? 'Su ubicación' : (R.o ? 'Punto de salida marcado' : 'Falta la salida'); $('od-d').textContent = R.dstName || 'Destino en el mapa'; }
+  }
   function drawMap() {
+    navRows();
     $('nav-new').hidden = !(R && (R.o || R.dst));
     if (!map) return;
     markers.clearLayers();
@@ -1121,7 +1152,20 @@ details ul{margin:8px 0 0;padding-left:20px}
 
   /* ---------------- Navegación tipo Waze ---------------- */
   var NAV = { on: false, sim: false, watch: null, timer: null, pos: null, last: 0, lastPos: null, routes: [], cur: 0, layer: null, me: null, path: null, idx: 0, busy: false, lock: null };
-  function navHour() { var h = parseHour($('nav-hour').value); if (isFinite(h)) return h; var d = new Date(); return d.getHours() + d.getMinutes() / 60; }
+  function nowH() { var d = new Date(); return d.getHours() + d.getMinutes() / 60; }
+  function navMode() { return $('nav-mode').value; }
+  function navHour() { var h = parseHour($('nav-hour').value); return (navMode() !== 'now' && isFinite(h)) ? h : nowH(); }
+  function mod24(x) { return ((x % 24) + 24) % 24; }
+  function fmtH(x) { x = mod24(x); var hh = Math.floor(x), mm = Math.round((x - hh) * 60); if (mm === 60) { hh = (hh + 1) % 24; mm = 0; } return hh + ':' + (mm < 10 ? '0' : '') + mm; }
+  /* «Llegar a las»: hora de salida tal que salida + tiempo de viaje con el tráfico de esa hora = hora de llegada. */
+  function navDepFor(rt, arr) {
+    var dep = arr - rt.min / 60, i;
+    for (i = 0; i < 8; i++) dep = arr - navEst(rt, mod24(dep)).min / 60;
+    return dep;
+  }
+  function navModeUi() { $('nav-hour').hidden = navMode() === 'now'; if (navMode() !== 'now' && !$('nav-hour').value) { var t = nowH(); $('nav-hour').value = fmtH(t).replace(/^(\d):/, '0$1:'); } }
+  $('nav-mode').addEventListener('change', function () { navModeUi(); if (NAV.on) navCheck('hora'); else navPreview(); });
+  $('nav-hour').addEventListener('change', function () { if (NAV.on) navCheck('hora'); else navPreview(); });
   function navSay(cls, title, body) { var el = $('nav-st'); el.hidden = false; el.className = 'navst ' + cls; el.innerHTML = '<b>' + title + '</b>' + body; }
   /* Tiempo estimado con tráfico: cada tramo con la velocidad que da el modelo para esa vía y esa hora. */
   function navEst(rt, h) {
@@ -1139,7 +1183,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     return { min: tot / 60, free: free / 60, sat: sat / 1000, ratio: free > 0 ? tot / free : 1 };
   }
   function navVerdict(e) {
-    if (e.ratio > 1.6 || e.sat > 0.5) return { c: 'bad', t: 'Ruta no viable ahora' };
+    if (e.ratio > 1.6 || e.sat > 0.5) return { c: 'bad', t: 'Ruta no viable a esa hora' };
     if (e.ratio > 1.25) return { c: 'mid', t: 'Ruta con tráfico pesado' };
     return { c: 'ok', t: 'Ruta viable' };
   }
@@ -1152,7 +1196,8 @@ details ul{margin:8px 0 0;padding-left:20px}
         var nm = (st.name || '').trim(); if (nm) { if (names[nm] === undefined) { names[nm] = 0; order.push(nm); } names[nm] += st.distance || 0; }
       }); });
       var big = order.filter(function (n) { return names[n] >= 300; });
-      return { geom: geom, km: rt.distance / 1000, min: rt.duration / 60, steps: steps, roads: (big.length ? big : order.slice(0, 3)) };
+      var pick = big.length ? big : order.slice(0, 3);
+      return { geom: geom, km: rt.distance / 1000, min: rt.duration / 60, steps: steps, roads: pick, rk: pick.map(function (n) { return { name: n, km: names[n] / 1000 }; }) };
     });
   }
   function navDist(pt, geom) {
@@ -1166,11 +1211,47 @@ details ul{margin:8px 0 0;padding-left:20px}
     NAV.layer = L.layerGroup().addTo(map);
     NAV.routes.forEach(function (r, i) {
       if (i === NAV.cur) return;
-      L.polyline(r.geom.map(function (p) { return [p[1], p[0]]; }), { color: '#7A8794', weight: 5, opacity: 0.7, dashArray: '8 8' }).addTo(NAV.layer);
+      L.polyline(r.geom.map(function (p) { return [p[1], p[0]]; }), { color: '#B79AF0', weight: 6, opacity: 0.85 }).addTo(NAV.layer);
     });
     var r = NAV.routes[NAV.cur];
-    if (r) L.polyline(r.geom.map(function (p) { return [p[1], p[0]]; }), { color: '#1F8FD0', weight: 7, opacity: 0.95 }).addTo(NAV.layer);
+    if (r) {
+      var ll = r.geom.map(function (p) { return [p[1], p[0]]; });
+      L.polyline(ll, { color: '#fff', weight: 11, opacity: 0.9 }).addTo(NAV.layer);
+      L.polyline(ll, { color: '#6B2FD6', weight: 7, opacity: 1 }).addTo(NAV.layer);
+    }
     if (NAV.pos && NAV.on) L.circleMarker(NAV.pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#1F6FEB', fillOpacity: 1 }).bindTooltip('Ustedes', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(NAV.layer);
+  }
+  function fmt12(x) { x = mod24(x); var hh = Math.floor(x), mm = Math.round((x - hh) * 60); if (mm === 60) { hh = (hh + 1) % 24; mm = 0; } var ap = hh >= 12 ? 'p. m.' : 'a. m.', h12 = hh % 12 === 0 ? 12 : hh % 12; return h12 + ':' + (mm < 10 ? '0' : '') + mm + ' ' + ap; }
+  function esc(t) { return String(t).replace(/[<>&"]/g, ''); }
+  function mainRoad(r) { var m = null; (r.rk || []).forEach(function (x) { if (!m || x.km > m.km) m = x; }); return m ? m.name : 'Ruta'; }
+  /* Lista de rutas tipo Waze: tarjeta por ruta, la elegida resaltada, detalle desplegable. */
+  function navRender(extra) {
+    var rs = NAV.routes, ev = NAV.ev, hs = NAV.hs, md = navMode(), h = '';
+    rs.forEach(function (r, i) {
+      var e = ev[i], v = navVerdict(e), dep = hs[i], arr = md === 'arr' ? navHour() : dep + e.min / 60, extraMin = e.min - e.free;
+      h += '<div class="rt v-' + v.c + (i === NAV.cur ? ' sel' : '') + '" data-i="' + i + '" role="button" tabindex="0" aria-label="Ruta ' + (i + 1) + '">' +
+        '<div class="rt-top"><span class="rt-n">' + (i + 1) + '</span><b class="rt-min">' + f0(e.min) + ' min</b><span class="rt-arr">' + (md === 'arr' ? 'Salir a las ' + fmt12(dep) : 'Llegada a las ' + fmt12(arr)) + '</span>' + (i === NAV.best ? '<span class="rt-best">MEJOR</span>' : '') + '</div>' +
+        '<div class="rt-via">' + esc(mainRoad(r)) + ' · ' + f1(r.km) + ' km</div>' +
+        '<div class="rt-tags"><span class="tag ' + v.c + '">' + (v.c === 'ok' ? 'Viable' : v.c === 'mid' ? 'Tráfico pesado' : 'No viable') + '</span>' + (extraMin >= 1 ? '<span class="tag">+' + f0(extraMin) + ' min por tráfico</span>' : '<span class="tag">Sin demoras</span>') + '</div>' +
+        '<button class="rt-more" type="button" data-more="' + i + '" aria-expanded="false">Más detalle ▾</button>' +
+        '<div class="rt-det" hidden><dl class="kv">' +
+          '<dt>Salida</dt><dd>' + fmt12(dep) + '</dd><dt>Llegada</dt><dd>' + fmt12(arr) + '</dd>' +
+          '<dt>Sin tráfico</dt><dd>' + f0(e.free) + ' min</dd><dt>Con tráfico estimado</dt><dd>' + f0(e.min) + ' min</dd>' +
+          (e.sat > 0.5 ? '<dt>Tramo saturado</dt><dd>' + f1(e.sat) + ' km</dd>' : '') + '</dl>' +
+          '<div class="note">Vías de la ruta</div><ol class="rt-roads">' + (r.rk || []).map(function (x) { return '<li>' + esc(x.name) + ' <span>' + f1(x.km) + ' km</span></li>'; }).join('') + '</ol></div>' +
+        '</div>';
+    });
+    $('nav-alts').innerHTML = h;
+    var cur = rs[NAV.cur], e = ev[NAV.cur];
+    if (NAV.on) {
+      var vk = navVerdict(e), bold = function (t) { return '<b style="display:inline;font-size:14px">' + t + '</b>'; };
+      var msg = (extra || '') + 'Faltan ' + bold(f1(cur.km) + ' km') + ' · llegada a las ' + bold(fmt12(hs[NAV.cur] + e.min / 60)) + ' (' + f0(e.min) + ' min con tráfico estimado).';
+      if (e.sat > 0.5) msg += ' Hay ' + f1(e.sat) + ' km donde la demanda supera la capacidad de la vía.';
+      if (NAV.best !== NAV.cur && e.min - ev[NAV.best].min >= Math.max(2, 0.1 * e.min)) msg += '<br>' + bold('Hay una ruta más rápida: ahorra ' + f0(e.min - ev[NAV.best].min) + ' min.') + ' Elíjanla en la lista.';
+      navSay(vk.c, vk.t, msg);
+    } else if (extra) navSay('mid', 'Rutas actualizadas', extra);
+    else $('nav-st').hidden = true;
+    navDraw();
   }
   function navCheck(reason, prev0) {
     if (NAV.busy || !NAV.pos || !R.dst) return;
@@ -1180,9 +1261,10 @@ details ul{margin:8px 0 0;padding-left:20px}
     fetch(url, { signal: ctl.signal }).then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); }).then(function (j) {
       if (!NAV.on && !prev0) return;
       if (j.code !== 'Ok') throw new Error('sin ruta');
-      var h = navHour(), rs = navParse(j);
+      var rs = navParse(j), md = navMode(), hs;
       if (!rs.length) throw new Error('sin ruta');
-      var ev = rs.map(function (r) { return navEst(r, h); });
+      hs = rs.map(function (r) { return md === 'arr' ? mod24(navDepFor(r, navHour())) : navHour(); });
+      var ev = rs.map(function (r, i) { return navEst(r, hs[i]); });
       /* la ruta que se venía siguiendo es la que más se parece a la anterior */
       var prev = NAV.routes[NAV.cur], keep = 0;
       if (prev && reason !== 'fuera') {
@@ -1190,27 +1272,12 @@ details ul{margin:8px 0 0;padding-left:20px}
         if (best > 150) keep = 0;
       }
       var bi = 0; ev.forEach(function (e, i) { if (e.min < ev[bi].min) bi = i; });
-      var msg = '', cls, title, extra = '';
+      var extra = '';
       var vk = navVerdict(ev[keep]);
-      NAV.routes = rs; NAV.ev = ev; NAV.cur = keep;
-      if (reason === 'fuera') { NAV.cur = bi; keep = bi; vk = navVerdict(ev[bi]); extra = 'Se salieron de la ruta: recalculada. '; }
-      else if (bi !== keep && vk.c === 'bad' && ev[bi].min < ev[keep].min) { NAV.cur = bi; extra = 'La ruta anterior no era viable: cambié a otra. '; vk = navVerdict(ev[bi]); keep = bi; }
-      var e = ev[NAV.cur], r = rs[NAV.cur];
-      cls = vk.c; title = vk.t;
-      msg = extra + 'Faltan <b style="display:inline;font-size:14px">' + f1(r.km) + ' km</b> · llegada en <b style="display:inline;font-size:14px">' + f0(e.min) + ' min</b> con tráfico estimado (' + f0(e.free) + ' min sin tráfico) a las ' + (function (x) { var hh = Math.floor(x), mm = Math.round((x - hh) * 60); if (mm === 60) { hh++; mm = 0; } return hh + ':' + (mm < 10 ? '0' : '') + mm; })(h) + '.';
-      if (e.sat > 0.5) msg += ' Hay ' + f1(e.sat) + ' km donde la demanda supera la capacidad de la vía.';
-      msg += '<br>Por: ' + r.roads.map(function (n) { return n.replace(/[<>&]/g, ''); }).join(' → ');
-      navSay(cls, title, msg);
-      var alts = '';
-      rs.forEach(function (a, i) {
-        if (i === NAV.cur) return;
-        var d = ev[NAV.cur].min - ev[i].min;
-        alts += '<div class="navalt"><span>Alternativa: ' + f1(a.km) + ' km · ' + f0(ev[i].min) + ' min · ' + (d > 0.5 ? 'ahorra ' + f0(d) + ' min' : (d < -0.5 ? 'tarda ' + f0(-d) + ' min más' : 'similar')) + '<br><span class="note">Por: ' + a.roads.slice(0, 3).map(function (n) { return n.replace(/[<>&]/g, ''); }).join(' → ') + '</span></span><button class="btn sec" data-alt="' + i + '" type="button">Tomar</button></div>';
-      });
-      $('nav-alts').innerHTML = alts;
-      navDraw();
-      if (bi === NAV.cur || ev[NAV.cur].min - ev[bi].min < Math.max(2, 0.1 * ev[NAV.cur].min)) { /* nada mejor */ }
-      else navSay(cls, title, msg + '<br><b style="display:inline;font-size:14px">Hay una ruta más rápida: ahorra ' + f0(ev[NAV.cur].min - ev[bi].min) + ' min.</b> Pueden tomarla abajo.');
+      NAV.routes = rs; NAV.ev = ev; NAV.hs = hs; NAV.cur = keep; NAV.best = bi;
+      if (reason === 'fuera') { NAV.cur = bi; extra = 'Se salieron de la ruta: recalculada. '; }
+      else if (bi !== keep && vk.c === 'bad' && ev[bi].min < ev[keep].min) { NAV.cur = bi; extra = 'La ruta anterior no era viable: cambié a otra. '; }
+      navRender(extra);
     }).catch(function () {
       if (NAV.on || prev0) navSay('mid', 'Sin conexión para recalcular', 'Sigo mostrando su posición. Intento de nuevo en unos segundos.');
     }).then(function () { clearTimeout(to); NAV.busy = false; });
@@ -1286,13 +1353,13 @@ details ul{margin:8px 0 0;padding-left:20px}
   $('nav-go').addEventListener('click', function () { navBegin(false); });
   $('nav-sim').addEventListener('click', function () { navBegin(true); });
   $('nav-stop').addEventListener('click', function () { navStop('Navegación detenida.'); });
+  function pickRoute(i) { if (!(i >= 0 && NAV.routes[i])) return; NAV.cur = i; NAV.last = Date.now(); navRender(''); if (map && NAV.routes[i]) { var g = NAV.routes[i].geom; if (!NAV.on && g.length) map.fitBounds(L.latLngBounds(g.map(function (p) { return [p[1], p[0]]; })), { padding: [30, 30] }); } }
   $('nav-alts').addEventListener('click', function (e) {
-    var b = e.target.closest('button[data-alt]'); if (!b) return;
-    NAV.cur = +b.getAttribute('data-alt'); NAV.last = Date.now();
-    var r = NAV.routes[NAV.cur], ev = NAV.ev[NAV.cur], vk = navVerdict(ev);
-    navSay(vk.c, vk.t, 'Tomaron otra ruta. Faltan ' + f1(r.km) + ' km · ' + f0(ev.min) + ' min con tráfico estimado.<br>Por: ' + r.roads.map(function (n) { return n.replace(/[<>&]/g, ''); }).join(' → '));
-    $('nav-alts').innerHTML = ''; navDraw();
+    var m = e.target.closest('button[data-more]');
+    if (m) { var d = m.parentNode.querySelector('.rt-det'); d.hidden = !d.hidden; m.setAttribute('aria-expanded', d.hidden ? 'false' : 'true'); m.textContent = d.hidden ? 'Más detalle ▾' : 'Menos detalle ▴'; return; }
+    var c = e.target.closest('.rt'); if (c) pickRoute(+c.getAttribute('data-i'));
   });
+  $('nav-alts').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('rt')) pickRoute(+e.target.getAttribute('data-i')); });
   function initMap() {
     if (typeof L === 'undefined') { $('map').textContent = 'No se pudo cargar el mapa.'; return; }
     map = L.map('map').setView(GT, 12);
@@ -1319,8 +1386,8 @@ details ul{margin:8px 0 0;padding-left:20px}
     navigator.geolocation.getCurrentPosition(function (p) { ME = [Math.round(p.coords.latitude * 1e6) / 1e6, Math.round(p.coords.longitude * 1e6) / 1e6]; cb(ME); }, function () { cb(null); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 12000 });
   }
   /* Elegir destino: la salida es la ubicación actual; si no hay GPS, se pide tocar el mapa. */
-  function setDest(ll) {
-    R.dst = ll; R.info = null; $('sugg').hidden = true;
+  function setDest(ll, name) {
+    R.dst = ll; R.dstName = name || null; R.info = null; $('sugg').hidden = true;
     function go(o) {
       if (!o) { R.o = null; drawMap(); renderRoute(); hint('No pude ubicarlos. Toquen en el mapa su punto de salida (o activen la ubicación del navegador).'); persist(); return; }
       R.o = o; drawMap(); route(); persist();
@@ -1336,7 +1403,7 @@ details ul{margin:8px 0 0;padding-left:20px}
       if (!a.length) { box.hidden = true; hint('No encontré ese lugar. Prueben con otro nombre.'); return; }
       a.forEach(function (x) {
         var b = document.createElement('button'); b.type = 'button'; b.textContent = (x.display_name || q).split(',').slice(0, 3).join(',');
-        b.addEventListener('click', function () { var ll = [Math.round(+x.lat * 1e6) / 1e6, Math.round(+x.lon * 1e6) / 1e6]; if (map) map.setView(ll, 14); setDest(ll); });
+        b.addEventListener('click', function () { var ll = [Math.round(+x.lat * 1e6) / 1e6, Math.round(+x.lon * 1e6) / 1e6]; if (map) map.setView(ll, 14); setDest(ll, b.textContent); });
         box.appendChild(b);
       });
       box.hidden = false; hint('Elijan su destino de la lista.');
