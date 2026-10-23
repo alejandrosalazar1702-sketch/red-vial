@@ -303,8 +303,8 @@ details ul{margin:8px 0 0;padding-left:20px}
             <button class="btn sec bad" id="nav-stop" type="button" hidden>Detener</button>
             <button class="btn sec" id="nav-new" type="button" hidden>Nueva ruta</button>
           </div>
-          <form class="viaf" id="via-f"><input id="via-q" type="search" placeholder="Pasar por una vía (ej. Bulevar El Naranjo)" aria-label="Pasar por una vía" autocomplete="off"><button class="btn sec" type="submit">Agregar</button></form>
-          <div class="note" id="via-msg"></div>
+          <form class="viaf hide-user" id="via-f"><input id="via-q" type="search" placeholder="Pasar por una vía (ej. Bulevar El Naranjo)" aria-label="Pasar por una vía" autocomplete="off"><button class="btn sec" type="submit">Agregar</button></form>
+          <div class="note hide-user" id="via-msg"></div>
           <div class="navst" id="nav-st" aria-live="polite" hidden></div>
           <div id="nav-alts"></div>
         </div>
@@ -1224,6 +1224,31 @@ details ul{margin:8px 0 0;padding-left:20px}
     }
     if (NAV.pos && NAV.on) L.circleMarker(NAV.pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#1F6FEB', fillOpacity: 1 }).bindTooltip('Ustedes', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(NAV.layer);
   }
+  /* Vías principales cerca del trayecto (OpenStreetMap), para ofrecer rutas por ellas sin que el usuario escriba nada. */
+  var VIACACHE = {};
+  function ptSegDist(p, a, b) {
+    var kx = Math.cos(a[0] * Math.PI / 180) * 111, ax = a[1] * kx, ay = a[0] * 111, bx = b[1] * kx, by = b[0] * 111, px = p[1] * kx, py = p[0] * 111;
+    var dx = bx - ax, dy = by - ay, t = dx * dx + dy * dy ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy))) : 0;
+    return Math.sqrt(Math.pow(px - ax - t * dx, 2) + Math.pow(py - ay - t * dy, 2));
+  }
+  function autoVias(o, d, skipNames, signal) {
+    var pad = 0.02, s0 = Math.min(o[0], d[0]) - pad, n0 = Math.max(o[0], d[0]) + pad, w0 = Math.min(o[1], d[1]) - pad, e0 = Math.max(o[1], d[1]) + pad;
+    if (n0 - s0 > 0.5 || e0 - w0 > 0.5) return Promise.resolve([]);
+    var key = [s0, w0, n0, e0].map(function (x) { return x.toFixed(3); }).join(','), q = '[out:json][timeout:20];way["highway"~"^(trunk|primary|secondary)$"]["name"](' + s0 + ',' + w0 + ',' + n0 + ',' + e0 + ');out center tags;';
+    var get = VIACACHE[key] ? Promise.resolve(VIACACHE[key]) : fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q), signal: signal }).then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); }).then(function (j) { VIACACHE[key] = j.elements || []; return VIACACHE[key]; });
+    return get.then(function (els) {
+      var rank = { trunk: 0, primary: 1, secondary: 2 }, best = {}, str = Math.max(1, haversine(o, d));
+      els.forEach(function (w) {
+        if (!w.center || !w.tags || !w.tags.name) return;
+        var c = [w.center.lat, w.center.lon], dist = ptSegDist(c, o, d), nm = w.tags.name, sn = norm(nm);
+        if (skipNames.some(function (x) { return norm(x).indexOf(sn) >= 0 || sn.indexOf(norm(x)) >= 0; })) return;
+        if (dist > Math.max(1.5, 0.6 * str)) return;
+        var score = dist + (rank[w.tags.highway] || 2) * 0.8;
+        if (!best[nm] || score < best[nm].score) best[nm] = { name: nm, ll: c, score: score };
+      });
+      return Object.keys(best).map(function (k) { return best[k]; }).sort(function (a, b) { return a.score - b.score; }).slice(0, 5);
+    }).catch(function () { return []; });
+  }
   function fmt12(x) { x = mod24(x); var hh = Math.floor(x), mm = Math.round((x - hh) * 60); if (mm === 60) { hh = (hh + 1) % 24; mm = 0; } var ap = hh >= 12 ? 'p. m.' : 'a. m.', h12 = hh % 12 === 0 ? 12 : hh % 12; return h12 + ':' + (mm < 10 ? '0' : '') + mm + ' ' + ap; }
   function esc(t) { return String(t).replace(/[<>&"]/g, ''); }
   function topRoads(r) { var a = (r.rk || []).slice().sort(function (x, y) { return y.km - x.km; }).slice(0, 2).map(function (x) { return x.name; }); return a.length ? a.join(' + ') : 'Ruta'; }
@@ -1269,9 +1294,13 @@ details ul{margin:8px 0 0;padding-left:20px}
     }
     /* Todas las vías posibles: las alternativas del mapa más rutas forzadas por puntos intermedios a ambos lados y por las vías que pidan. */
     osrm([o, d], true).then(function (base) {
-      var jobs = [];
-      NAV.vias.forEach(function (v) { jobs.push(osrm([o, v.ll, d], false).then(function (a) { a.forEach(function (x) { x.via = v.name; }); return a; }).catch(function () { return []; })); });
-      if (full && base.length) {
+      var skip = []; base.forEach(function (r) { (r.rk || []).forEach(function (x) { skip.push(x.name); }); });
+      return (full ? autoVias(o, d, skip, ctl.signal) : Promise.resolve([])).then(function (auto) { return { base: base, auto: auto }; });
+    }).then(function (st) {
+      var base = st.base, jobs = [];
+      st.auto.concat(NAV.vias).forEach(function (v) { jobs.push(osrm([o, v.ll, d], false).then(function (a) {
+        var nn = norm(v.name); a = a.filter(function (x) { return x.steps.some(function (t) { var tn = norm(t.name); return tn && (tn.indexOf(nn) >= 0 || nn.indexOf(tn) >= 0); }); }); a.forEach(function (x) { x.via = v.name; }); return a.slice(0, 1); }).catch(function () { return []; })); });
+      if (full && base.length && st.auto.length < 3) {
         var g = base[0].geom, str = Math.max(1, haversine(o, d)), off = Math.min(4, Math.max(1.2, 0.22 * str));
         [0.33, 0.66].forEach(function (f) {
           var k = Math.max(1, Math.min(g.length - 2, Math.round(f * (g.length - 1)))), a = g[k - 1], b = g[k + 1], dx = (b[0] - a[0]) * Math.cos(g[k][1] * Math.PI / 180), dy = b[1] - a[1], n = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -1294,7 +1323,7 @@ details ul{margin:8px 0 0;padding-left:20px}
         });
         var kmin = Math.min.apply(null, out.map(function (r) { return r.km; })), tmin = Math.min.apply(null, out.map(function (r) { return r.min; }));
         out = out.filter(function (r, i) { return i === 0 || r.via || (r.km <= kmin * 1.8 && r.min <= tmin * 1.9); });
-        return out.slice(0, 7);
+        return out.slice(0, 8);
       });
     }).then(function (rs) {
       if (!NAV.on && !prev0) return;
