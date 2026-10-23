@@ -1,5 +1,5 @@
 /* Guarda la app para abrirla sin conexión. Los mapas y las rutas siguen necesitando internet. */
-var V = 'redvial-v20';
+var V = 'redvial-v21';
 var SHELL = ['./', 'index.html', 'model.js', 'manifest.webmanifest',
   'vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css', 'vendor/qrcode.js',
   'icons/icon-192.png', 'icons/icon-512.png'];

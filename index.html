@@ -81,7 +81,7 @@ body.lock .lockmsg{display:block}
 .rt.sel{box-shadow:0 0 0 2px var(--accent);background:var(--accent-soft)}
 .rt-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .rt-n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:13px}
-.rt-min{font-size:22px}
+.rt-min{font-size:22px}.rt-min.long{font-size:18px;line-height:1.25}
 .rt-arr{font-size:13px;color:var(--muted)}
 .rt-best{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.05em;color:#fff;background:#1B9E5A;border-radius:4px;padding:2px 7px}
 .rt-via{margin-top:4px;font-size:14.5px}
@@ -1050,7 +1050,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     var i = R.info;
     if (i && i.km) {
       h += '<dt>Distancia por carretera</dt><dd>' + f1(i.km) + ' km</dd>';
-      h += '<dt>Sin tráfico, según el mapa</dt><dd>' + f0(i.min) + ' min</dd>';
+      h += '<dt>Sin tráfico, según el mapa</dt><dd>' + fmtDur(i.min) + '</dd>';
       h += '<dt>Velocidad de referencia</dt><dd>' + f0(i.km / (i.min / 60)) + ' km/h</dd>';
     } else if (i && i.straight) {
       h += '<dt>Distancia en línea recta</dt><dd>' + f1(i.straight) + ' km</dd>';
@@ -1251,6 +1251,13 @@ details ul{margin:8px 0 0;padding-left:20px}
       return Object.keys(best).map(function (k) { return best[k]; }).sort(function (a, b) { return a.score - b.score; }).slice(0, 5);
     }).catch(function () { return []; });
   }
+  /* Duración legible: menos de 60 min en minutos; desde 60, en horas y minutos («1 hora con 30 minutos»). */
+  function fmtDur(m) {
+    m = Math.max(0, Math.round(m));
+    if (m < 60) return m + ' min';
+    var h = Math.floor(m / 60), r = m % 60;
+    return h + (h === 1 ? ' hora' : ' horas') + (r ? ' con ' + r + (r === 1 ? ' minuto' : ' minutos') : '');
+  }
   function fmt12(x) { x = mod24(x); var hh = Math.floor(x), mm = Math.round((x - hh) * 60); if (mm === 60) { hh = (hh + 1) % 24; mm = 0; } var ap = hh >= 12 ? 'p. m.' : 'a. m.', h12 = hh % 12 === 0 ? 12 : hh % 12; return h12 + ':' + (mm < 10 ? '0' : '') + mm + ' ' + ap; }
   function esc(t) { return String(t).replace(/[<>&"]/g, ''); }
   function topRoads(r) { var a = (r.rk || []).slice().sort(function (x, y) { return y.km - x.km; }).slice(0, 2).map(function (x) { return x.name; }); return a.length ? a.join(' + ') : 'Ruta'; }
@@ -1261,13 +1268,13 @@ details ul{margin:8px 0 0;padding-left:20px}
     rs.forEach(function (r, i) {
       var e = ev[i], v = navVerdict(e), dep = hs[i], arr = md === 'arr' ? navHour() : dep + e.min / 60, extraMin = e.min - e.free;
       h += '<div class="rt v-' + v.c + (i === NAV.cur ? ' sel' : '') + '" data-i="' + i + '" role="button" tabindex="0" aria-label="Ruta ' + (i + 1) + '">' +
-        '<div class="rt-top"><span class="rt-n">' + (i + 1) + '</span><b class="rt-min">' + f0(e.min) + ' min</b><span class="rt-arr">' + (md === 'arr' ? 'Salir a las ' + fmt12(dep) : 'Llegada a las ' + fmt12(arr)) + '</span>' + (i === NAV.best ? '<span class="rt-best">MEJOR</span>' : '') + '</div>' +
+        '<div class="rt-top"><span class="rt-n">' + (i + 1) + '</span><b class="rt-min' + (e.min >= 60 ? ' long' : '') + '">' + fmtDur(e.min) + '</b><span class="rt-arr">' + (md === 'arr' ? 'Salir a las ' + fmt12(dep) : 'Llegada a las ' + fmt12(arr)) + '</span>' + (i === NAV.best ? '<span class="rt-best">MEJOR</span>' : '') + '</div>' +
         '<div class="rt-via">' + esc(r.via ? 'Pasando por ' + r.via : topRoads(r)) + ' · ' + f1(r.km) + ' km</div>' +
-        '<div class="rt-tags"><span class="tag ' + v.c + '">' + (v.c === 'ok' ? 'Viable' : v.c === 'mid' ? 'Tráfico pesado' : 'No viable') + '</span>' + (extraMin >= 1 ? '<span class="tag">+' + f0(extraMin) + ' min por tráfico</span>' : '<span class="tag">Sin demoras</span>') + '</div>' +
+        '<div class="rt-tags"><span class="tag ' + v.c + '">' + (v.c === 'ok' ? 'Viable' : v.c === 'mid' ? 'Tráfico pesado' : 'No viable') + '</span>' + (extraMin >= 1 ? '<span class="tag">+' + fmtDur(extraMin) + ' por tráfico</span>' : '<span class="tag">Sin demoras</span>') + '</div>' +
         '<button class="rt-more" type="button" data-more="' + i + '" aria-expanded="false">Más detalle ▾</button>' +
         '<div class="rt-det" hidden><dl class="kv">' +
           '<dt>Salida</dt><dd>' + fmt12(dep) + '</dd><dt>Llegada</dt><dd>' + fmt12(arr) + '</dd>' +
-          '<dt>Sin tráfico</dt><dd>' + f0(e.free) + ' min</dd><dt>Con tráfico estimado</dt><dd>' + f0(e.min) + ' min</dd>' +
+          '<dt>Sin tráfico</dt><dd>' + fmtDur(e.free) + '</dd><dt>Con tráfico estimado</dt><dd>' + fmtDur(e.min) + '</dd>' +
           (e.sat > 0.5 ? '<dt>Tramo saturado</dt><dd>' + f1(e.sat) + ' km</dd>' : '') + '</dl>' +
           '<div class="note">Vías de la ruta</div><ol class="rt-roads">' + (r.rk || []).map(function (x) { return '<li>' + esc(x.name) + ' <span>' + f1(x.km) + ' km</span></li>'; }).join('') + '</ol></div>' +
         '</div>';
@@ -1278,9 +1285,9 @@ details ul{margin:8px 0 0;padding-left:20px}
     if (near && !NAV.on) navSay('mid', 'La salida está junto al destino', 'Según el navegador, su ubicación está a menos de 500 m del destino' + (MEACC > 300 ? ' (precisión ±' + f0(MEACC) + ' m)' : '') + '. Si no es así, toquen «Su ubicación» arriba y marquen la salida en el mapa.');
     else if (NAV.on) {
       var vk = navVerdict(e), bold = function (t) { return '<b style="display:inline;font-size:14px">' + t + '</b>'; };
-      var msg = (extra || '') + 'Faltan ' + bold(f1(cur.km) + ' km') + ' · llegada a las ' + bold(fmt12(hs[NAV.cur] + e.min / 60)) + ' (' + f0(e.min) + ' min con tráfico estimado).';
+      var msg = (extra || '') + 'Faltan ' + bold(f1(cur.km) + ' km') + ' · llegada a las ' + bold(fmt12(hs[NAV.cur] + e.min / 60)) + ' (' + fmtDur(e.min) + ' con tráfico estimado).';
       if (e.sat > 0.5) msg += ' Hay ' + f1(e.sat) + ' km donde la demanda supera la capacidad de la vía.';
-      if (NAV.best !== NAV.cur && e.min - ev[NAV.best].min >= Math.max(2, 0.1 * e.min)) msg += '<br>' + bold('Hay una ruta más rápida: ahorra ' + f0(e.min - ev[NAV.best].min) + ' min.') + ' Elíjanla en la lista.';
+      if (NAV.best !== NAV.cur && e.min - ev[NAV.best].min >= Math.max(2, 0.1 * e.min)) msg += '<br>' + bold('Hay una ruta más rápida: ahorra ' + fmtDur(e.min - ev[NAV.best].min) + '.') + ' Elíjanla en la lista.';
       navSay(vk.c, vk.t, msg);
     } else if (extra) navSay('mid', 'Rutas actualizadas', extra);
     else $('nav-st').hidden = true;
