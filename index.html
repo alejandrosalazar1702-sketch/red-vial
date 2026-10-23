@@ -895,8 +895,8 @@ details ul{margin:8px 0 0;padding-left:20px}
   function segKm() {
     var typed = parseFloat($('m-len').value), c = curRoad();
     if (segManual && typed > 0) return typed;
-    if (c.km >= 0.05) return Math.round(c.km * 100) / 100;
     if (R && R.info && R.info.km >= 0.05) return Math.round(R.info.km * 100) / 100;
+    if (c.km >= 0.05) return Math.round(c.km * 100) / 100;
     return typed > 0 ? typed : 1;
   }
   /* La lista de vías muestra solo las vías por las que pasa la ruta marcada en el mapa. */
@@ -929,7 +929,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     if (!isFinite(h) || h < 0 || h >= 24) { auto = null; $('m-auto').textContent = ''; return; }
     if (!c.key) {
       if (auto) { $('m-count').value = ''; $('m-sec').value = ''; }
-      auto = null; if (!segManual && c.km >= 0.05) $('m-len').value = segKm();
+      auto = null; if (!segManual) $('m-len').value = segKm();
       $('m-auto').textContent = 'Para ' + c.name + ' no hay cifras de referencia. Midan en campo: cuenten los vehículos de un carril durante 30 minutos y cronometren el tramo.';
       return;
     }
@@ -937,7 +937,7 @@ details ul{margin:8px 0 0;padding-left:20px}
     var r = refRow(h, c.key, lanes, segKm(), c.name);
     $('m-count').value = r.count; if (!segManual) $('m-len').value = r.len; auto = { count: r.count, len: r.len, min: Math.round(r.sec / 60 * 100) / 100, cap: r.cap, road: c.name };
     $('m-sec').value = auto.min;
-    $('m-auto').textContent = 'Valores de referencia para ' + c.name + ' (' + lanes + ' carriles) a las ' + fh(h) + (c.km >= 0.05 && !segManual ? '; el tramo es lo que recorre su ruta por esta vía (' + f1(c.km) + ' km)' : '') + '. Si miden en campo, escriban sus propios valores y la medición contará como real.';
+    $('m-auto').textContent = 'Valores de referencia para ' + c.name + ' (' + lanes + ' carriles) a las ' + fh(h) + (!segManual && R && R.info && R.info.km >= 0.05 ? '; el tramo es la distancia total de su ruta (' + f1(R.info.km) + ' km)' : '') + '. Si miden en campo, escriban sus propios valores y la medición contará como real.';
     previewMeas();
   }
   var lanesSrc = 'estimado';
